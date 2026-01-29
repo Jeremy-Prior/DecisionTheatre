@@ -25,6 +25,9 @@ import (
 //go:embed static/*
 var staticFS embed.FS
 
+//go:embed all:docs_site/*
+var docsFS embed.FS
+
 // Server holds all the components for the web application
 type Server struct {
 	cfg        config.Config
@@ -103,6 +106,15 @@ func (s *Server) setupRoutes() {
 	// Style and TileJSON endpoints
 	s.router.HandleFunc("/data/style.json", s.handleStyleJSON).Methods("GET")
 	s.router.HandleFunc("/data/tiles.json", s.handleTileJSON).Methods("GET")
+
+	// Embedded documentation site (MkDocs build output)
+	docsContent, err := fs.Sub(docsFS, "docs_site")
+	if err != nil {
+		log.Printf("Warning: Could not load embedded docs: %v", err)
+	} else {
+		docsFileServer := http.StripPrefix("/docs/", http.FileServer(http.FS(docsContent)))
+		s.router.PathPrefix("/docs/").Handler(docsFileServer)
+	}
 
 	// Static frontend files (embedded)
 	staticContent, err := fs.Sub(staticFS, "static")

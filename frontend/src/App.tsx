@@ -3,12 +3,14 @@ import { Box, Flex, useDisclosure } from '@chakra-ui/react';
 import MapView from './components/MapView';
 import ControlPanel from './components/ControlPanel';
 import Header from './components/Header';
+import DocsPanel from './components/DocsPanel';
 import SetupGuide from './components/SetupGuide';
 import { useServerInfo } from './hooks/useApi';
 import type { Scenario, ComparisonState } from './types';
 
 function App() {
   const { isOpen, onToggle } = useDisclosure({ defaultIsOpen: false });
+  const { isOpen: isDocsOpen, onToggle: onToggleDocs, onClose: onCloseDocs } = useDisclosure({ defaultIsOpen: false });
   const { info } = useServerInfo();
 
   const [comparison, setComparison] = useState<ComparisonState>({
@@ -36,7 +38,7 @@ function App() {
 
   return (
     <Flex direction="column" h="100vh" overflow="hidden">
-      <Header onTogglePanel={onToggle} isPanelOpen={isOpen} />
+      <Header onTogglePanel={onToggle} isPanelOpen={isOpen} onToggleDocs={onToggleDocs} isDocsOpen={isDocsOpen} />
 
       <Flex flex={1} overflow="hidden" position="relative">
         {/* Map area - shrinks when panel opens */}
@@ -58,6 +60,9 @@ function App() {
           onAttributeChange={handleAttributeChange}
         />
       </Flex>
+
+      {/* Docs panel - always mounted to preserve iframe navigation state */}
+      <DocsPanel isOpen={isDocsOpen} onClose={onCloseDocs} />
     </Flex>
   );
 }

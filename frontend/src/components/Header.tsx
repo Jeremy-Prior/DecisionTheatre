@@ -9,15 +9,17 @@ import {
   useColorModeValue,
   Tooltip,
 } from '@chakra-ui/react';
-import { FiSettings, FiLayers, FiCpu, FiZap } from 'react-icons/fi';
+import { FiSettings, FiLayers, FiCpu, FiZap, FiHelpCircle } from 'react-icons/fi';
 import { useServerInfo } from '../hooks/useApi';
 
 interface HeaderProps {
   onTogglePanel: () => void;
   isPanelOpen: boolean;
+  onToggleDocs: () => void;
+  isDocsOpen: boolean;
 }
 
-function Header({ onTogglePanel, isPanelOpen }: HeaderProps) {
+function Header({ onTogglePanel, isPanelOpen, onToggleDocs, isDocsOpen }: HeaderProps) {
   const { info } = useServerInfo();
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
@@ -104,6 +106,17 @@ function Header({ onTogglePanel, isPanelOpen }: HeaderProps) {
             </Badge>
           </Tooltip>
         </HStack>
+
+        <Tooltip label="Documentation">
+          <IconButton
+            aria-label="Toggle documentation"
+            icon={<FiHelpCircle />}
+            onClick={onToggleDocs}
+            variant={isDocsOpen ? 'solid' : 'ghost'}
+            colorScheme="brand"
+            size="sm"
+          />
+        </Tooltip>
 
         <IconButton
           aria-label="Toggle control panel"

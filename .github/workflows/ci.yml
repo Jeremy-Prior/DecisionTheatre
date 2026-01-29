@@ -74,8 +74,10 @@ jobs:
         with:
           go-version: '1.24'
 
-      - name: Create stub static dir for embed
-        run: mkdir -p internal/server/static && touch internal/server/static/.gitkeep
+      - name: Create stub dirs for embed
+        run: |
+          mkdir -p internal/server/static && touch internal/server/static/.gitkeep
+          mkdir -p internal/server/docs_site && touch internal/server/docs_site/.gitkeep
 
       - name: Install dependencies
         run: |
@@ -120,8 +122,10 @@ jobs:
         with:
           go-version: '1.24'
 
-      - name: Create stub static dir for embed
-        run: mkdir -p internal/server/static && touch internal/server/static/.gitkeep
+      - name: Create stub dirs for embed
+        run: |
+          mkdir -p internal/server/static && touch internal/server/static/.gitkeep
+          mkdir -p internal/server/docs_site && touch internal/server/docs_site/.gitkeep
 
       - name: Install dependencies
         run: |

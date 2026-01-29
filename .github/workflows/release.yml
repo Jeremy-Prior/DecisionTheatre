@@ -57,6 +57,15 @@ jobs:
           npm ci
           npm run build
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build documentation
+        run: |
+          pip install mkdocs mkdocs-material mkdocs-minify-plugin pygments pymdown-extensions
+          mkdocs build -d internal/server/docs_site
+
       - name: Copy frontend to embed dir (unix)
         if: runner.os != 'Windows'
         run: |

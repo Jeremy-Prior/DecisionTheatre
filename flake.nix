@@ -22,6 +22,29 @@
         ]);
 
         # =====================================================
+        # Documentation: built via MkDocs
+        # =====================================================
+        docs = pkgs.stdenvNoCC.mkDerivation {
+          pname = "decision-theatre-docs";
+          inherit version;
+          src = pkgs.lib.cleanSourceWith {
+            src = ./.;
+            filter = path: type:
+              let baseName = baseNameOf (toString path); in
+              baseName == "mkdocs.yml" ||
+              pkgs.lib.hasPrefix (toString ./docs) (toString path);
+          };
+          nativeBuildInputs = [ mkdocsEnv ];
+          buildPhase = ''
+            mkdocs build -d site
+          '';
+          installPhase = ''
+            mkdir -p $out
+            cp -r site/* $out/
+          '';
+        };
+
+        # =====================================================
         # Frontend: built via buildNpmPackage
         # All npm dependencies are fetched into the nix store
         # with a pinned hash. No npm at runtime. Full SBOM.
@@ -104,9 +127,10 @@
           # Inject the nix-built frontend into the embed directory
           preBuild = ''
             export CGO_ENABLED=1
-            rm -rf internal/server/static
-            mkdir -p internal/server/static
+            rm -rf internal/server/static internal/server/docs_site
+            mkdir -p internal/server/static internal/server/docs_site
             cp -r ${frontend}/* internal/server/static/
+            cp -r ${docs}/* internal/server/docs_site/
 
             # webview_go hardcodes webkit2gtk-4.0 but nixpkgs ships 4.1
             # Create compat pkg-config and library symlink
@@ -150,7 +174,7 @@
         # Packages
         # =====================================================
         packages = {
-          inherit frontend decision-theatre;
+          inherit frontend docs decision-theatre;
           default = decision-theatre;
         };
 

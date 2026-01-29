@@ -20,6 +20,7 @@ BIN_DIR := bin
 COVERAGE_FILE := coverage.out
 FRONTEND_DIR := frontend
 STATIC_DIR := internal/server/static
+DOCS_SITE_DIR := internal/server/docs_site
 VENDOR_LLAMA := vendor/github.com/go-skynet/go-llama.cpp
 
 GO := go
@@ -39,8 +40,8 @@ all: test build
 # Build (dev iteration)
 # ============================
 
-# Full build: frontend then backend
-build: build-frontend build-backend
+# Full build: frontend, docs, then backend
+build: build-frontend build-docs build-backend
 
 # Backend only (assumes static/ already populated)
 build-backend:
@@ -53,6 +54,10 @@ build-frontend:
 	@rm -rf $(STATIC_DIR)
 	@mkdir -p $(STATIC_DIR)
 	cp -r $(FRONTEND_DIR)/dist/* $(STATIC_DIR)/
+
+# Build MkDocs site into embed dir
+build-docs:
+	mkdocs build -d $(DOCS_SITE_DIR)
 
 # Build llama.cpp binding library (once after clone)
 build-llama:
@@ -105,6 +110,7 @@ deps:
 clean:
 	rm -rf $(BIN_DIR)
 	rm -rf $(STATIC_DIR)
+	rm -rf $(DOCS_SITE_DIR)
 	rm -f $(COVERAGE_FILE)
 	$(GO) clean
 

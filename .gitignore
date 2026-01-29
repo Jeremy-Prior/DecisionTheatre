@@ -13,6 +13,7 @@ vendor/
 frontend/node_modules/
 frontend/dist/
 internal/server/static/
+internal/server/docs_site/
 
 # Data files (user-provided)
 data/*.mbtiles
