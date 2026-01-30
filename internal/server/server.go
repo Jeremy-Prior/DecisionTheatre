@@ -97,6 +97,10 @@ func (s *Server) setupRoutes() {
 	apiHandler := api.NewHandler(s.tileStore, s.geoStore, s.llmEngine, s.nnModel, s.cfg)
 	apiHandler.RegisterRoutes(apiRouter)
 
+	// Data pack management routes
+	s.router.HandleFunc("/api/datapack/status", s.handleDatapackStatus).Methods("GET")
+	s.router.HandleFunc("/api/datapack/install", s.handleDatapackInstall).Methods("POST")
+
 	// Tile routes - served directly for performance
 	if s.tileStore != nil {
 		s.router.HandleFunc("/tiles/{name}/{z:[0-9]+}/{x:[0-9]+}/{y:[0-9]+}.pbf",

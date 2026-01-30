@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Box,
   Heading,
@@ -7,6 +8,13 @@ import {
   Flex,
   Badge,
   Divider,
+  Input,
+  Button,
+  HStack,
+  Alert,
+  AlertIcon,
+  Progress,
+  useToast,
 } from '@chakra-ui/react';
 import type { ServerInfo } from '../types';
 
@@ -15,6 +23,45 @@ interface SetupGuideProps {
 }
 
 function SetupGuide({ info }: SetupGuideProps) {
+  const [zipPath, setZipPath] = useState('');
+  const [installing, setInstalling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+
+  const handleInstall = async () => {
+    if (!zipPath.trim()) return;
+    setInstalling(true);
+    setError(null);
+
+    try {
+      const res = await fetch('/api/datapack/install', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: zipPath.trim() }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Installation failed');
+        return;
+      }
+
+      toast({
+        title: 'Data pack installed',
+        description: 'Reloading application...',
+        status: 'success',
+        duration: 2000,
+      });
+
+      // Reload after a short delay so the user sees the success message
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Network error');
+    } finally {
+      setInstalling(false);
+    }
+  };
+
   return (
     <Flex
       align="center"
@@ -61,44 +108,58 @@ function SetupGuide({ info }: SetupGuideProps) {
 
           <Divider borderColor="gray.700" />
 
-          {/* Setup instructions */}
-          {!info.tiles_loaded && (
-            <Box>
-              <Heading size="sm" mb={3} color="orange.300">
-                Step 1: Obtain the GeoPackage
-              </Heading>
-              <Text color="gray.300" mb={3}>
-                The map data originates from a GeoPackage file containing African
-                catchment boundaries, country outlines, rivers, lakes, ecoregions,
-                and populated places. Contact the project maintainers to obtain{' '}
-                <Code colorScheme="orange">UoW_layers.gpkg</Code>.
-              </Text>
-              <Text color="gray.300" mb={2}>
-                Place it in the resources directory:
-              </Text>
-              <Code
-                display="block"
-                p={3}
+          {/* Data pack installer */}
+          <Box>
+            <Heading size="sm" mb={3} color="blue.300">
+              Install Data Pack
+            </Heading>
+            <Text color="gray.300" mb={3}>
+              Provide the path to a Decision Theatre data pack (.zip) file.
+              The application will extract and register it automatically.
+            </Text>
+            <HStack spacing={2}>
+              <Input
+                placeholder="/path/to/decision-theatre-data-v1.0.0.zip"
+                value={zipPath}
+                onChange={(e) => setZipPath(e.target.value)}
                 bg="gray.800"
-                borderRadius="md"
-                fontSize="sm"
-                whiteSpace="pre"
-              >{`resources/mbtiles/UoW_layers.gpkg`}</Code>
-            </Box>
-          )}
+                borderColor="gray.600"
+                isDisabled={installing}
+                onKeyDown={(e) => e.key === 'Enter' && handleInstall()}
+              />
+              <Button
+                colorScheme="blue"
+                onClick={handleInstall}
+                isLoading={installing}
+                loadingText="Installing"
+                isDisabled={!zipPath.trim() || installing}
+                flexShrink={0}
+              >
+                Install
+              </Button>
+            </HStack>
+            {installing && (
+              <Progress size="xs" isIndeterminate mt={2} colorScheme="blue" />
+            )}
+            {error && (
+              <Alert status="error" mt={3} borderRadius="md" bg="red.900">
+                <AlertIcon />
+                {error}
+              </Alert>
+            )}
+          </Box>
 
+          <Divider borderColor="gray.700" />
+
+          {/* Manual setup instructions */}
           {!info.tiles_loaded && (
             <Box>
               <Heading size="sm" mb={3} color="orange.300">
-                Step 2: Convert to MBTiles
+                Alternative: Manual Setup
               </Heading>
               <Text color="gray.300" mb={3}>
-                Use the included conversion script to convert the GeoPackage into
-                vector MBTiles. This requires{' '}
-                <Code colorScheme="blue">gdal</Code>,{' '}
-                <Code colorScheme="blue">tippecanoe</Code>, and{' '}
-                <Code colorScheme="blue">sqlite3</Code> (all available in the nix
-                devShell):
+                If you don't have a data pack, you can prepare the data manually.
+                Obtain the GeoPackage file and convert it to MBTiles:
               </Text>
               <Code
                 display="block"
@@ -110,63 +171,14 @@ function SetupGuide({ info }: SetupGuideProps) {
               >{`# Enter the development shell (provides all tools)
 nix develop
 
-# Run the conversion (takes ~10-30 minutes)
+# Convert GeoPackage to MBTiles
 cd resources/mbtiles
-./gpkg_to_mbtiles.sh UoW_layers.gpkg catchments.mbtiles`}</Code>
-              <Text color="gray.400" fontSize="sm" mt={2}>
-                This will produce a ~8 GB MBTiles file with all vector layers
-                merged at appropriate zoom levels.
-              </Text>
+./gpkg_to_mbtiles.sh UoW_layers.gpkg catchments.mbtiles
+
+# Then restart the application
+nix run`}</Code>
             </Box>
           )}
-
-          {!info.tiles_loaded && (
-            <Box>
-              <Heading size="sm" mb={3} color="orange.300">
-                Step 3: Run the application
-              </Heading>
-              <Text color="gray.300" mb={3}>
-                Once the MBTiles file is in place, restart the application:
-              </Text>
-              <Code
-                display="block"
-                p={3}
-                bg="gray.800"
-                borderRadius="md"
-                fontSize="sm"
-                whiteSpace="pre"
-              >{`# From the project root directory:
-nix run
-
-# Or in headless mode (open http://localhost:8080):
-nix run . -- --headless`}</Code>
-            </Box>
-          )}
-
-          {info.tiles_loaded && !info.geo_loaded && (
-            <Box>
-              <Heading size="sm" mb={3} color="blue.300">
-                Optional: Add scenario data
-              </Heading>
-              <Text color="gray.300" mb={3}>
-                To enable scenario comparison, place GeoParquet files in the data
-                directory:
-              </Text>
-              <Code
-                display="block"
-                p={3}
-                bg="gray.800"
-                borderRadius="md"
-                fontSize="sm"
-                whiteSpace="pre"
-              >{`data/
-  past.geoparquet
-  present.geoparquet
-  future.geoparquet`}</Code>
-            </Box>
-          )}
-
-          <Divider borderColor="gray.700" />
 
           <Box>
             <Heading size="sm" mb={3} color="gray.300">
@@ -180,13 +192,12 @@ nix run . -- --headless`}</Code>
               fontSize="sm"
               whiteSpace="pre"
               color="gray.400"
-            >{`DecisionTheatre/
+            >{`Data Pack (.zip):
+  manifest.json             <- pack metadata
   resources/
     mbtiles/
       catchments.mbtiles    <- vector tile data (required)
       uow_tiles.json        <- MapBox style (included)
-      gpkg_to_mbtiles.sh    <- conversion script (included)
-      UoW_layers.gpkg       <- source GeoPackage (obtain separately)
   data/
     *.geoparquet            <- scenario data (optional)`}</Code>
           </Box>

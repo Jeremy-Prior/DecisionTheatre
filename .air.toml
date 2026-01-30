@@ -1,0 +1,32 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  bin = "./tmp/decision-theatre"
+  cmd = "go build -o ./tmp/decision-theatre ."
+  delay = 1000
+  exclude_dir = ["tmp", "frontend", "node_modules", ".go", ".git", "data", "resources", "dist", "vendor"]
+  exclude_regex = ["_test\\.go$"]
+  exclude_unchanged = false
+  follow_symlink = false
+  include_ext = ["go", "html", "json"]
+  include_dir = []
+  kill_delay = "1s"
+  log = "build-errors.log"
+  send_interrupt = true
+  stop_on_error = true
+
+[build.args_bin]
+  _ = ["--port", "8080", "--headless", "--data-dir", "./data", "--resources-dir", "./resources"]
+
+[color]
+  build = "yellow"
+  main = "magenta"
+  runner = "green"
+  watcher = "cyan"
+
+[log]
+  time = false
+
+[misc]
+  clean_on_exit = true

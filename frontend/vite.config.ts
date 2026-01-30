@@ -7,6 +7,8 @@ export default defineConfig({
     proxy: {
       '/api': 'http://localhost:8080',
       '/tiles': 'http://localhost:8080',
+      '/data': 'http://localhost:8080',
+      '/docs': 'http://localhost:8080',
     },
   },
   build: {

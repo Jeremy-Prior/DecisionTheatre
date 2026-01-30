@@ -1,0 +1,25 @@
+app-id: org.kartoza.DecisionTheatre
+runtime: org.gnome.Platform
+runtime-version: '46'
+sdk: org.gnome.Sdk
+command: decision-theatre
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=x11
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --filesystem=home:ro
+
+modules:
+  - name: decision-theatre
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 decision-theatre /app/bin/decision-theatre
+      - install -Dm644 decision-theatre.desktop /app/share/applications/org.kartoza.DecisionTheatre.desktop
+    sources:
+      - type: file
+        path: decision-theatre
+      - type: file
+        path: decision-theatre.desktop

@@ -9,7 +9,7 @@ import {
   useColorModeValue,
   Tooltip,
 } from '@chakra-ui/react';
-import { FiSettings, FiLayers, FiCpu, FiZap, FiHelpCircle } from 'react-icons/fi';
+import { FiSettings, FiLayers, FiCpu, FiZap, FiHelpCircle, FiGrid, FiMaximize } from 'react-icons/fi';
 import { useServerInfo } from '../hooks/useApi';
 
 interface HeaderProps {
@@ -17,9 +17,11 @@ interface HeaderProps {
   isPanelOpen: boolean;
   onToggleDocs: () => void;
   isDocsOpen: boolean;
+  onToggleQuad: () => void;
+  isQuadMode: boolean;
 }
 
-function Header({ onTogglePanel, isPanelOpen, onToggleDocs, isDocsOpen }: HeaderProps) {
+function Header({ onTogglePanel, isPanelOpen, onToggleDocs, isDocsOpen, onToggleQuad, isQuadMode }: HeaderProps) {
   const { info } = useServerInfo();
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
@@ -106,6 +108,17 @@ function Header({ onTogglePanel, isPanelOpen, onToggleDocs, isDocsOpen }: Header
             </Badge>
           </Tooltip>
         </HStack>
+
+        <Tooltip label={isQuadMode ? 'Single pane' : 'Quad panes'}>
+          <IconButton
+            aria-label="Toggle quad pane layout"
+            icon={isQuadMode ? <FiMaximize /> : <FiGrid />}
+            onClick={onToggleQuad}
+            variant={isQuadMode ? 'solid' : 'ghost'}
+            colorScheme="accent"
+            size="sm"
+          />
+        </Tooltip>
 
         <Tooltip label="Documentation">
           <IconButton

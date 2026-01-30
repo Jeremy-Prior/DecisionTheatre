@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -20,8 +21,8 @@ var version = "dev"
 func main() {
 	// Parse command-line flags
 	port := flag.Int("port", 8080, "HTTP server port")
-	dataDir := flag.String("data-dir", "./data", "Directory containing data files (mbtiles, geoparquet)")
-	resourcesDir := flag.String("resources-dir", "./resources", "Directory containing resource files (mbtiles, styles)")
+	dataDir := flag.String("data-dir", "", "Directory containing data files (mbtiles, geoparquet)")
+	resourcesDir := flag.String("resources-dir", "", "Directory containing resource files (mbtiles, styles)")
 	modelPath := flag.String("model", "", "Path to GGUF model file for embedded LLM")
 	headless := flag.Bool("headless", false, "Run in headless mode (no GUI window)")
 	showVersion := flag.Bool("version", false, "Show version and exit")
@@ -32,11 +33,46 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Resolve data and resources directories:
+	// 1. Explicit flags take priority
+	// 2. Otherwise, load from saved settings (data pack path)
+	// 3. Fall back to ./data and ./resources (SetupGuide will handle missing data)
+	resolvedDataDir := *dataDir
+	resolvedResourcesDir := *resourcesDir
+
+	if resolvedDataDir == "" || resolvedResourcesDir == "" {
+		settings, err := config.LoadSettings()
+		if err != nil {
+			log.Printf("Warning: could not load settings: %v", err)
+		} else if settings.DataPackPath != "" {
+			packData := filepath.Join(settings.DataPackPath, "data")
+			packResources := filepath.Join(settings.DataPackPath, "resources")
+			if _, err := os.Stat(packData); err == nil {
+				if resolvedDataDir == "" {
+					resolvedDataDir = packData
+				}
+				if resolvedResourcesDir == "" {
+					resolvedResourcesDir = packResources
+				}
+				log.Printf("Using data pack: %s", settings.DataPackPath)
+			} else {
+				log.Printf("Warning: saved data pack path no longer exists: %s", settings.DataPackPath)
+			}
+		}
+	}
+
+	if resolvedDataDir == "" {
+		resolvedDataDir = "./data"
+	}
+	if resolvedResourcesDir == "" {
+		resolvedResourcesDir = "./resources"
+	}
+
 	// Build configuration
 	cfg := config.Config{
 		Port:         *port,
-		DataDir:      *dataDir,
-		ResourcesDir: *resourcesDir,
+		DataDir:      resolvedDataDir,
+		ResourcesDir: resolvedResourcesDir,
 		ModelPath:    *modelPath,
 		Version:      version,
 	}

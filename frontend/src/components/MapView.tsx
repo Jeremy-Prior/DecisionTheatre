@@ -4,6 +4,7 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { ComparisonState } from '../types';
 import { SCENARIOS } from '../types';
+import { registerMap, unregisterMap } from '../hooks/useMapSync';
 
 interface MapViewProps {
   comparison: ComparisonState;
@@ -195,6 +196,9 @@ function MapView({ comparison }: MapViewProps) {
     leftMapRef.current = leftMap;
     rightMapRef.current = rightMap;
 
+    // Register the left map for cross-pane sync
+    const syncId = registerMap(leftMap);
+
     // Slider drag handling
     function onPointerDown(e: PointerEvent) {
       isDragging.current = true;
@@ -224,6 +228,7 @@ function MapView({ comparison }: MapViewProps) {
     window.addEventListener('pointerup', onPointerUp);
 
     return () => {
+      unregisterMap(syncId);
       slider.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);

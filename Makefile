@@ -28,10 +28,11 @@ GOFMT := gofmt
 GOLINT := golangci-lint
 
 .PHONY: all build build-backend build-frontend build-llama clean
-.PHONY: dev dev-frontend
+.PHONY: dev dev-backend dev-frontend dev-all
 .PHONY: test test-frontend test-all
 .PHONY: fmt lint check deps
 .PHONY: docs docs-serve
+.PHONY: datapack
 .PHONY: help info
 
 all: test build
@@ -71,8 +72,23 @@ build-llama:
 dev: build-backend
 	$(BIN_DIR)/$(BINARY_NAME) --port 8080 --data-dir ./data
 
+# Go backend with air hot-reload (watches .go files, auto-rebuilds)
+dev-backend:
+	air
+
+# Vite dev server with HMR (proxies /api, /tiles, /data, /docs to :8080)
 dev-frontend:
 	cd $(FRONTEND_DIR) && npx vite
+
+# Full dev stack: air (Go hot-reload on :8080) + Vite HMR (on :5173)
+# Open http://localhost:5173 in your browser
+dev-all:
+	@echo "Starting Go backend (air) on :8080 and Vite on :5173"
+	@echo "Open http://localhost:5173 for live development"
+	@echo ""
+	@trap 'kill 0' EXIT; \
+	air & \
+	sleep 2 && cd $(FRONTEND_DIR) && npx vite
 
 # ============================
 # Testing
@@ -124,6 +140,13 @@ docs:
 docs-serve:
 	mkdocs serve
 
+# ============================
+# Data pack
+# ============================
+
+datapack:
+	./scripts/build-datapack.sh $(VERSION)
+
 docs-requirements:
 	cd requirements && mkdocs build
 
@@ -157,8 +180,10 @@ help:
 	@echo "  clean           Remove artifacts"
 	@echo ""
 	@echo "Dev:"
-	@echo "  dev             Run backend (port 8080)"
-	@echo "  dev-frontend    Run Vite dev server"
+	@echo "  dev-all         Go hot-reload + Vite HMR (recommended)"
+	@echo "  dev-backend     Go backend with air (hot-reload)"
+	@echo "  dev-frontend    Vite dev server (HMR)"
+	@echo "  dev             Run backend once (no hot-reload)"
 	@echo ""
 	@echo "Test:"
 	@echo "  test            Go tests + coverage"

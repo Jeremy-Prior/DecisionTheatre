@@ -139,11 +139,264 @@ jobs:
           name: checksums-${{ matrix.suffix }}
           path: dist/checksums-*.txt
 
+      # Upload raw binary for packaging jobs
+      - uses: actions/upload-artifact@v4
+        if: runner.os != 'Windows'
+        with:
+          name: binary-${{ matrix.suffix }}
+          path: dist/decision-theatre
+
+  # ==========================================
+  # Linux: DEB and RPM via nfpm
+  # ==========================================
+  package-linux-nfpm:
+    needs: build
+    strategy:
+      matrix:
+        include:
+          - suffix: linux-amd64
+            goarch: amd64
+          - suffix: linux-arm64
+            goarch: arm64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-${{ matrix.suffix }}
+          path: dist
+
+      - name: Make binary executable
+        run: chmod +x dist/decision-theatre
+
+      - name: Install nfpm
+        run: |
+          echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
+          sudo apt-get update
+          sudo apt-get install -y nfpm
+
+      - name: Build DEB
+        env:
+          VERSION: ${{ github.ref_name }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          VERSION="${VERSION#v}"
+          nfpm package -p deb -f packaging/nfpm.yaml -t dist/
+
+      - name: Build RPM
+        env:
+          VERSION: ${{ github.ref_name }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          VERSION="${VERSION#v}"
+          nfpm package -p rpm -f packaging/nfpm.yaml -t dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-nfpm-${{ matrix.suffix }}
+          path: |
+            dist/*.deb
+            dist/*.rpm
+
+  # ==========================================
+  # Linux: AppImage
+  # ==========================================
+  package-appimage:
+    needs: build
+    strategy:
+      matrix:
+        include:
+          - suffix: linux-amd64
+            arch: x86_64
+          - suffix: linux-arm64
+            arch: aarch64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-${{ matrix.suffix }}
+          path: dist
+
+      - name: Make binary executable
+        run: chmod +x dist/decision-theatre
+
+      - name: Build AppImage
+        run: |
+          # Download appimagetool
+          wget -q "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage" -O appimagetool
+          chmod +x appimagetool
+
+          # Create AppDir
+          mkdir -p AppDir/usr/bin
+          cp dist/decision-theatre AppDir/usr/bin/
+          cp packaging/appimage/AppRun AppDir/
+          cp packaging/appimage/decision-theatre.desktop AppDir/
+          # Placeholder icon (1x1 PNG)
+          echo -n "" > AppDir/decision-theatre.png
+          touch AppDir/decision-theatre.png
+
+          # Build
+          ARCH=${{ matrix.arch }} ./appimagetool --no-appstream AppDir/ \
+            "dist/Decision_Theatre-${{ matrix.arch }}.AppImage"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-appimage-${{ matrix.suffix }}
+          path: dist/*.AppImage
+
+  # ==========================================
+  # Linux: Flatpak
+  # ==========================================
+  package-flatpak:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-linux-amd64
+          path: dist
+
+      - name: Make binary executable
+        run: chmod +x dist/decision-theatre
+
+      - name: Install Flatpak tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.gnome.Platform//46 org.gnome.Sdk//46
+
+      - name: Build Flatpak
+        run: |
+          cp dist/decision-theatre packaging/flatpak/
+          cp packaging/decision-theatre.desktop packaging/flatpak/
+          cd packaging/flatpak
+          flatpak-builder --user --force-clean --repo=repo build org.kartoza.DecisionTheatre.yml
+          flatpak build-bundle repo ../../dist/decision-theatre.flatpak org.kartoza.DecisionTheatre
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-flatpak
+          path: dist/*.flatpak
+
+  # ==========================================
+  # Linux: Snap
+  # ==========================================
+  package-snap:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-linux-amd64
+          path: packaging/snap
+
+      - name: Make binary executable
+        run: chmod +x packaging/snap/decision-theatre
+
+      - uses: snapcore/action-build@v1
+        id: snapcraft
+        with:
+          path: packaging/snap
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-snap
+          path: ${{ steps.snapcraft.outputs.snap }}
+
+  # ==========================================
+  # macOS: .dmg Application Bundle
+  # ==========================================
+  package-macos:
+    needs: build
+    strategy:
+      matrix:
+        include:
+          - suffix: darwin-amd64
+            arch: amd64
+            os: macos-13
+          - suffix: darwin-arm64
+            arch: arm64
+            os: macos-14
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: binary-${{ matrix.suffix }}
+          path: dist
+
+      - name: Make binary executable
+        run: chmod +x dist/decision-theatre
+
+      - name: Create DMG
+        run: |
+          cd dist
+          bash ../packaging/macos/create-dmg.sh \
+            decision-theatre \
+            "${{ github.ref_name }}" \
+            "${{ matrix.arch }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-macos-${{ matrix.suffix }}
+          path: dist/*.dmg
+
+  # ==========================================
+  # Windows: MSI installer
+  # ==========================================
+  package-windows:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-windows-amd64
+          path: dist
+
+      - name: Extract binary
+        run: |
+          Expand-Archive -Path dist\decision-theatre-windows-amd64.zip -DestinationPath dist\
+
+      - name: Install WiX
+        run: dotnet tool install --global wix
+
+      - name: Build MSI
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          # Ensure 3-part version for MSI
+          $parts = $version.Split(".")
+          while ($parts.Length -lt 3) { $parts += "0" }
+          $msiVersion = ($parts[0..2]) -join "."
+          wix build packaging\windows\product.wxs -d Version=$msiVersion -o dist\decision-theatre-windows-amd64.msi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-windows
+          path: dist/*.msi
+
   # ==========================================
   # Publish GitHub release with all artifacts
   # ==========================================
   release:
-    needs: build
+    needs:
+      - build
+      - package-linux-nfpm
+      - package-appimage
+      - package-flatpak
+      - package-snap
+      - package-macos
+      - package-windows
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -158,8 +411,18 @@ jobs:
           merge-multiple: true
           path: checksums
 
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          merge-multiple: true
+          path: release
+
       - name: Merge checksums
-        run: cat checksums/checksums-*.txt | sort > release/checksums.txt
+        run: |
+          cat checksums/checksums-*.txt | sort > release/checksums.txt
+          # Add checksums for installers
+          cd release
+          sha256sum *.deb *.rpm *.AppImage *.flatpak *.snap *.dmg *.msi 2>/dev/null >> checksums.txt || true
 
       - uses: softprops/action-gh-release@v2
         with:
@@ -168,19 +431,35 @@ jobs:
           body: |
             ## Installation
 
-            Download the archive for your platform, extract it, and run:
+            ### Download the installer for your platform
+
+            | Platform | Package | Notes |
+            |----------|---------|-------|
+            | **Ubuntu/Debian** | `.deb` | `sudo dpkg -i decision-theatre-*.deb` |
+            | **Fedora/RHEL** | `.rpm` | `sudo rpm -i decision-theatre-*.rpm` |
+            | **Any Linux** | `.AppImage` | `chmod +x *.AppImage && ./*.AppImage` |
+            | **Flatpak** | `.flatpak` | `flatpak install decision-theatre.flatpak` |
+            | **Snap** | `.snap` | `sudo snap install --dangerous *.snap` |
+            | **NixOS** | Flake | `nix profile install github:kartoza/DecisionTheatre` |
+            | **macOS** | `.dmg` | Open and drag to Applications |
+            | **Windows** | `.msi` | Run the installer |
+
+            ### Portable binaries (no installer)
 
             **Linux/macOS:**
             ```bash
             tar xzf decision-theatre-*.tar.gz
-            ./decision-theatre --data-dir ./data --resources-dir ./resources
+            ./decision-theatre
             ```
 
             **Windows:**
-            Extract the zip, then run:
-            ```
-            decision-theatre.exe --data-dir ./data --resources-dir ./resources
-            ```
+            Extract the zip, then run `decision-theatre.exe`.
+
+            ### Data Pack
+
+            The application requires a data pack to load map tiles and scenario data.
+            On first launch, you'll be prompted to provide the path to a data pack (.zip).
+            Contact the project maintainers to obtain the data pack.
 
             ### Headless mode (no GUI window)
             ```bash

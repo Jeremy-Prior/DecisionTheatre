@@ -235,6 +235,7 @@
             impl
             delve
             go-tools
+            air
 
             # Node.js (for frontend dev iteration only)
             nodejs_22
@@ -323,8 +324,10 @@
             echo "  nix run               - Build and run the application"
             echo ""
             echo "Dev iteration (uses tools from nix store):"
-            echo "  make dev              - Run Go backend (port 8080)"
-            echo "  make dev-frontend     - Run Vite dev server"
+            echo "  make dev-all          - Go hot-reload + Vite HMR (recommended)"
+            echo "  make dev-backend      - Go backend with air (hot-reload on :8080)"
+            echo "  make dev-frontend     - Vite dev server (HMR on :5173)"
+            echo "  make dev              - Run Go backend once (no hot-reload)"
             echo "  make test             - Run Go tests"
             echo "  make test-frontend    - Run frontend tests"
             echo "  make docs-serve       - Serve requirements docs"

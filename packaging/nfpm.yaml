@@ -1,0 +1,35 @@
+name: decision-theatre
+arch: "${GOARCH}"
+platform: linux
+version: "${VERSION}"
+section: science
+priority: optional
+maintainer: Kartoza <info@kartoza.com>
+description: Offline catchment data exploration with embedded AI
+vendor: Kartoza
+homepage: https://github.com/kartoza/DecisionTheatre
+license: GPL-3.0
+
+contents:
+  - src: dist/decision-theatre
+    dst: /usr/bin/decision-theatre
+    file_info:
+      mode: 0755
+
+  - src: packaging/decision-theatre.desktop
+    dst: /usr/share/applications/decision-theatre.desktop
+
+depends:
+  - libwebkit2gtk-4.1-0
+
+rpm:
+  depends:
+    - webkit2gtk4.1
+
+overrides:
+  rpm:
+    depends:
+      - webkit2gtk4.1
+  deb:
+    depends:
+      - libwebkit2gtk-4.1-0

@@ -13,32 +13,75 @@ This triggers the GitHub Actions release workflow.
 
 ## What the Release Workflow Does
 
-The `.github/workflows/release.yml` workflow:
+The `.github/workflows/release.yml` workflow has two phases:
 
-1. **Builds platform-specific binaries** using a matrix strategy:
+### Phase 1: Build Binaries
 
-    | Runner | Target | Archive |
-    |--------|--------|---------|
-    | `ubuntu-latest` | `linux/amd64` | `.tar.gz` |
-    | `ubuntu-24.04-arm` | `linux/arm64` | `.tar.gz` |
-    | `macos-13` | `darwin/amd64` | `.tar.gz` |
-    | `macos-14` | `darwin/arm64` | `.tar.gz` |
-    | `windows-latest` | `windows/amd64` | `.zip` |
+Builds platform-specific binaries using a matrix strategy:
 
-2. **For each platform:**
-    - Sets up Go 1.24 and Node.js 22
-    - Builds the frontend (`npm ci && npm run build`)
-    - Copies built frontend into `internal/server/static/`
-    - Installs platform-specific CGO dependencies
-    - Builds the Go binary with `-ldflags "-s -w -X main.version=<tag>"`
-    - Packages into `.tar.gz` (Unix) or `.zip` (Windows)
-    - Generates SHA256 checksums
+| Runner | Target | Archive |
+|--------|--------|---------|
+| `ubuntu-latest` | `linux/amd64` | `.tar.gz` |
+| `ubuntu-24.04-arm` | `linux/arm64` | `.tar.gz` |
+| `macos-13` | `darwin/amd64` | `.tar.gz` |
+| `macos-14` | `darwin/arm64` | `.tar.gz` |
+| `windows-latest` | `windows/amd64` | `.zip` |
 
-3. **Creates a GitHub Release** with:
-    - All platform archives
-    - Merged checksums file
-    - Auto-generated release notes
-    - Installation instructions
+For each platform:
+
+1. Sets up Go 1.24, Node.js 22, and Python 3.12
+2. Builds the frontend (`npm ci && npm run build`)
+3. Builds documentation (`mkdocs build`)
+4. Copies built assets into `internal/server/static/` and `internal/server/docs_site/`
+5. Installs platform-specific CGO dependencies
+6. Builds the Go binary with `-ldflags "-s -w -X main.version=<tag>"`
+7. Packages into `.tar.gz` (Unix) or `.zip` (Windows)
+8. Generates SHA256 checksums
+
+### Phase 2: Package Installers
+
+After binaries are built, parallel packaging jobs create platform-native installers:
+
+| Job | Output | Tool |
+|-----|--------|------|
+| `package-linux-nfpm` | `.deb`, `.rpm` (amd64 + arm64) | [nfpm](https://nfpm.goreleaser.com/) |
+| `package-appimage` | `.AppImage` (amd64 + arm64) | [appimagetool](https://github.com/AppImage/appimagetool) |
+| `package-flatpak` | `.flatpak` (amd64) | `flatpak-builder` |
+| `package-snap` | `.snap` (amd64) | `snapcraft` |
+| `package-macos` | `.dmg` (amd64 + arm64) | `hdiutil` |
+| `package-windows` | `.msi` (amd64) | [WiX Toolset](https://wixtoolset.org/) |
+
+### Phase 3: Publish Release
+
+All artifacts are collected and published as a GitHub Release with:
+
+- Platform archives (`.tar.gz`, `.zip`)
+- Installer packages (`.deb`, `.rpm`, `.AppImage`, `.flatpak`, `.snap`, `.dmg`, `.msi`)
+- Merged SHA256 checksums file
+- Auto-generated release notes with installation instructions
+
+## Building a Data Pack
+
+Data packs are built locally (not in CI) because they contain large binary data files:
+
+```bash
+make datapack
+```
+
+This creates `dist/decision-theatre-data-v{VERSION}.zip` with a SHA256 checksum. Upload the data pack to the GitHub Release manually or distribute it separately.
+
+## Packaging Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `packaging/nfpm.yaml` | DEB and RPM package definition |
+| `packaging/decision-theatre.desktop` | Linux desktop entry |
+| `packaging/appimage/AppRun` | AppImage entry point |
+| `packaging/flatpak/org.kartoza.DecisionTheatre.yml` | Flatpak manifest |
+| `packaging/snap/snapcraft.yaml` | Snap definition |
+| `packaging/macos/Info.plist` | macOS app bundle metadata |
+| `packaging/macos/create-dmg.sh` | macOS DMG creation script |
+| `packaging/windows/product.wxs` | WiX MSI definition |
 
 ## Platform-Specific CGO Dependencies
 
@@ -64,8 +107,12 @@ This makes it available via `--version` and in the UI header badge.
 2. Update the version in `flake.nix` (`version = "x.y.z"`)
 3. Run `nix build` locally to verify the build
 4. Run `nix flake check` to verify tests
-5. Create and push the tag
+5. Build and test the data pack: `make datapack`
+6. Create and push the tag
+7. After the release is published, attach the data pack zip to the release
 
 ## Nix Build
 
 For Nix users, `nix build` always produces a current build from source. The Nix flake version is set in `flake.nix` and should be updated to match the Git tag for releases.
+
+Users can install directly: `nix profile install github:kartoza/DecisionTheatre`

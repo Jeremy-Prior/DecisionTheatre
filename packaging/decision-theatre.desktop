@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Decision Theatre
+Comment=Offline catchment data exploration with embedded AI
+Exec=decision-theatre
+Icon=decision-theatre
+Terminal=false
+Type=Application
+Categories=Science;Geography;Education;
+Keywords=catchment;water;gis;map;

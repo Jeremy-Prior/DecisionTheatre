@@ -1,37 +1,102 @@
 # Data Setup
 
-Decision Theatre requires map tile data and optionally scenario data files.
+Decision Theatre separates the application (binary + docs) from the data. Data is distributed as a **data pack** — a single `.zip` file containing map tiles, styles, and optional scenario data.
 
-## Required: Map Tiles (MBTiles)
+## Installing a Data Pack
 
-The application needs a vector MBTiles file at `resources/mbtiles/catchments.mbtiles` containing African catchment boundaries, country outlines, rivers, lakes, ecoregions, and populated places.
+### Via the Application UI
 
-### Obtaining the Source GeoPackage
+On first launch (or when no data is loaded), the application shows a Setup Guide with a data pack installer:
 
-Contact the project maintainers to obtain `UoW_layers.gpkg`. This file contains all the vector layers used in the application.
+1. Obtain a data pack `.zip` file from the project maintainers
+2. Enter the full file path in the "Install Data Pack" field
+3. Click **Install**
+4. The application extracts the data pack and reloads automatically
 
-### Converting to MBTiles
+The extracted data is stored in your user data directory:
 
-Use the included conversion script. This requires `gdal`, `tippecanoe`, and `sqlite3` (all available in the Nix devShell):
+| Platform | Path |
+|----------|------|
+| Linux | `~/.local/share/decision-theatre/datapacks/` |
+| macOS | `~/Library/Application Support/decision-theatre/datapacks/` |
+| Windows | `%LOCALAPPDATA%\decision-theatre\datapacks\` |
+
+The application remembers the data pack location across restarts.
+
+### Via Command-Line Flags
+
+You can also point directly at extracted data directories:
 
 ```bash
-# Enter the development shell
-nix develop
+./decision-theatre --data-dir /path/to/data --resources-dir /path/to/resources
+```
 
-# Run the conversion
+## Data Pack Format
+
+A data pack is a `.zip` archive with this structure:
+
+```
+decision-theatre-data-v1.0.0.zip
+├── manifest.json
+├── data/
+│   └── *.geoparquet          # scenario data (optional)
+└── resources/
+    └── mbtiles/
+        ├── catchments.mbtiles # vector tile data (required)
+        └── uow_tiles.json    # MapBox style (required)
+```
+
+### manifest.json
+
+```json
+{
+  "format": "decision-theatre-datapack",
+  "version": "1.0.0",
+  "description": "UoW Catchments Data Pack",
+  "created": "2026-01-29T00:00:00Z"
+}
+```
+
+## Building a Data Pack
+
+Data packs are built locally by project maintainers using:
+
+```bash
+make datapack
+```
+
+Or directly:
+
+```bash
+./scripts/build-datapack.sh [version]
+```
+
+This:
+
+1. Validates `data/` and `resources/` directories
+2. Generates a `manifest.json`
+3. Creates `dist/decision-theatre-data-v{VERSION}.zip`
+4. Generates a SHA256 checksum
+
+### Prerequisites for Building
+
+The source data must be prepared first:
+
+1. Obtain `UoW_layers.gpkg` from the project maintainers
+2. Convert to MBTiles using the included script:
+
+```bash
+nix develop
 cd resources/mbtiles
 ./gpkg_to_mbtiles.sh UoW_layers.gpkg catchments.mbtiles
 ```
 
-The script:
+3. Optionally add GeoParquet scenario files to `data/`
+4. Run `make datapack`
 
-1. Discovers all feature layers in the GeoPackage
-2. Checks for and optionally fixes NULL geometries
-3. Exports each layer to GeoJSONSeq
-4. Builds per-layer MBTiles with appropriate zoom ranges
-5. Merges all layers into a single MBTiles file
+## Required: Map Tiles (MBTiles)
 
-The output is approximately 8 GB.
+The application needs a vector MBTiles file containing African catchment boundaries, country outlines, rivers, lakes, ecoregions, and populated places.
 
 ### Layer Zoom Ranges
 
@@ -46,7 +111,7 @@ The output is approximately 8 GB.
 
 ## Optional: Scenario Data (GeoParquet)
 
-To enable scenario comparison, place GeoParquet files in the `data/` directory:
+To enable scenario comparison, include GeoParquet files in the data pack's `data/` directory:
 
 ```
 data/
@@ -59,26 +124,10 @@ Each file should contain catchment geometries with attribute columns representin
 
 ## Optional: LLM Model (GGUF)
 
-To enable the AI chat feature, download a GGUF model file and pass its path at startup:
+To enable the AI chat feature, pass a GGUF model path at startup:
 
 ```bash
 ./decision-theatre --model ./models/your-model.gguf
 ```
 
-## Optional: Neural Network Model
-
-A trained Gorgonia model file (`.gob`) can be placed in the data directory for catchment prediction features.
-
-## Directory Structure
-
-```
-DecisionTheatre/
-  resources/
-    mbtiles/
-      catchments.mbtiles    # vector tile data (required)
-      uow_tiles.json        # MapBox style (included)
-      gpkg_to_mbtiles.sh    # conversion script (included)
-      UoW_layers.gpkg       # source GeoPackage (obtain separately)
-  data/
-    *.geoparquet            # scenario data (optional)
-```
+LLM models are not included in data packs due to their size.
