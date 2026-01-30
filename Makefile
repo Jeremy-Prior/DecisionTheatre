@@ -32,7 +32,8 @@ GOLINT := golangci-lint
 .PHONY: test test-frontend test-all
 .PHONY: fmt lint check deps
 .PHONY: docs docs-serve
-.PHONY: datapack
+.PHONY: packages packages-linux packages-windows packages-darwin
+.PHONY: csv2parquet datapack list-datapack
 .PHONY: help info
 
 all: test build
@@ -141,11 +142,51 @@ docs-serve:
 	mkdocs serve
 
 # ============================
-# Data pack
+# Packaging
 # ============================
 
+# Build release packages for all platforms (linux + windows cross-compile)
+packages: build-frontend build-docs
+	./scripts/build-packages.sh --platform all --version $(VERSION)
+
+# Platform-specific package targets
+packages-linux: build-frontend build-docs
+	./scripts/build-packages.sh --platform linux --version $(VERSION)
+
+packages-windows: build-frontend build-docs
+	./scripts/build-packages.sh --platform windows --version $(VERSION)
+
+packages-darwin: build-frontend build-docs
+	./scripts/build-packages.sh --platform darwin --version $(VERSION)
+
+# ============================
+# Data conversion & packing
+# ============================
+
+# Convert CSV data files to Parquet (requires pyarrow from nix develop)
+csv2parquet:
+	python3 scripts/csv2parquet.py --data-dir ./data
+
+# Build data pack: converts CSVs to Parquet, bundles with mbtiles into a zip
 datapack:
 	./scripts/build-datapack.sh $(VERSION)
+
+# List contents of the most recently built data pack
+list-datapack:
+	@PACK=$$(ls -t dist/decision-theatre-data-v*.zip 2>/dev/null | head -1); \
+	if [ -z "$$PACK" ]; then \
+		echo "No data pack found in dist/. Run 'make datapack' first."; \
+		exit 1; \
+	fi; \
+	echo "Data pack: $$PACK"; \
+	echo "Size: $$(du -h "$$PACK" | cut -f1)"; \
+	echo "SHA256: $$(cat "$${PACK}.sha256" 2>/dev/null || sha256sum "$$PACK" | cut -d' ' -f1)"; \
+	echo ""; \
+	echo "Manifest:"; \
+	unzip -p "$$PACK" "*/manifest.json" | jq .; \
+	echo ""; \
+	echo "Contents:"; \
+	unzip -l "$$PACK"
 
 docs-requirements:
 	cd requirements && mkdocs build
@@ -192,6 +233,15 @@ help:
 	@echo ""
 	@echo "Quality:"
 	@echo "  fmt / lint / check"
+	@echo ""
+	@echo "Packaging:"
+	@echo "  packages          All platforms (linux + windows cross-compile)"
+	@echo "  packages-linux    Linux .tar.gz, .deb, .rpm"
+	@echo "  packages-windows  Windows .zip (needs mingw-w64)"
+	@echo "  packages-darwin   macOS .tar.gz / .dmg (macOS only)"
+	@echo "  csv2parquet        Convert CSV data files to Parquet"
+	@echo "  datapack          Data pack .zip (parquet + mbtiles)"
+	@echo "  list-datapack     List contents of last built data pack"
 	@echo ""
 	@echo "Docs:"
 	@echo "  docs / docs-serve"

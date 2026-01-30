@@ -61,23 +61,58 @@ All are available in the Nix dev shell (`nix develop`).
 
 The MapBox GL Style JSON at `resources/mbtiles/uow_tiles.json` defines how each layer is rendered (colours, line widths, label placement). Edit this file to change the map's visual appearance.
 
-## Scenario Data (GeoParquet)
+## Scenario Data (CSV to Parquet)
 
-Place GeoParquet files in the `data/` directory:
+Raw scenario data is delivered as CSV files:
+
+| File | Description |
+|------|-------------|
+| `data/LDD_current.csv` | Current scenario — per-catchment metrics |
+| `data/LDD_ref.csv` | Reference scenario — per-catchment metrics |
+| `data/LDD_column_Metadata.csv` | Column definitions and variable types |
+| `data/herb_traits_ready.csv` | Herbivore trait data |
+
+All CSVs share a `catchID` column that cross-references catchment polygons in the MBTiles map.
+
+### Converting CSV to Parquet
+
+Convert CSVs to Parquet for efficient storage and fast columnar reads:
+
+```bash
+make csv2parquet
+```
+
+This runs `scripts/csv2parquet.py` which uses PyArrow to produce snappy-compressed Parquet files alongside the source CSVs in `data/`. The CSV files are gitignored; only the conversion tooling is tracked.
+
+### Building a Data Pack
+
+To bundle the Parquet files and MBTiles into a distributable zip:
+
+```bash
+make datapack
+```
+
+This automatically converts any CSVs to Parquet first, then assembles:
 
 ```
-data/
-  past.geoparquet
-  present.geoparquet
-  future.geoparquet
+decision-theatre-data-v{VERSION}/
+  data/
+    LDD_current.parquet
+    LDD_ref.parquet
+    LDD_column_Metadata.parquet
+    herb_traits_ready.parquet
+  resources/
+    mbtiles/
+      catchments.mbtiles
+      uow_tiles.json
+  manifest.json
 ```
 
-Each file should contain:
+The resulting zip can be extracted on another host and used with `--data-dir` and `--resources-dir`.
 
-- A geometry column with catchment boundaries
-- Attribute columns for each factor available for comparison
+### GeoParquet (future)
 
-The server reads these files at startup and exposes the attribute names via the API.
+Place GeoParquet files in the `data/` directory for spatial scenario data with embedded geometry. The server reads these at startup and exposes attribute names via the API.
 
 ## LLM Model (GGUF)
 

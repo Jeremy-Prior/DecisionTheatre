@@ -17,6 +17,7 @@ internal/server/static/
 internal/server/docs_site/
 
 # Data files (user-provided)
+data/*.csv
 data/*.mbtiles
 data/*.parquet
 data/*.geoparquet

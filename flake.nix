@@ -21,6 +21,11 @@
           pymdown-extensions
         ]);
 
+        # Python environment for data tooling (CSV -> Parquet conversion)
+        dataToolsEnv = pkgs.python3.withPackages (ps: with ps; [
+          pyarrow
+        ]);
+
         # =====================================================
         # Documentation: built via MkDocs
         # =====================================================
@@ -268,6 +273,9 @@
             # Documentation
             mkdocsEnv
 
+            # Data tooling (CSV -> Parquet)
+            dataToolsEnv
+
             # Nix tooling
             nil
             nixpkgs-fmt
@@ -277,12 +285,19 @@
             git
             gh
 
+            # Packaging
+            nfpm
+            zip
+
             # Security scanning
             trivy
           ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
             # WebView (embedded browser window)
             webkitgtk_4_1
             gtk3
+
+            # Windows cross-compilation
+            pkgs.pkgsCross.mingwW64.stdenv.cc
           ];
 
           shellHook = ''
@@ -331,6 +346,14 @@
             echo "  make test             - Run Go tests"
             echo "  make test-frontend    - Run frontend tests"
             echo "  make docs-serve       - Serve requirements docs"
+            echo ""
+            echo "Data & packaging:"
+            echo "  make csv2parquet      - Convert CSV data files to Parquet"
+            echo "  make datapack         - Build data pack zip (parquet + mbtiles)"
+            echo "  make list-datapack    - List contents of last built data pack"
+            echo "  make packages         - Build release packages (all platforms)"
+            echo "  make packages-linux   - Linux .tar.gz, .deb, .rpm"
+            echo "  make packages-windows - Windows .zip, .msi"
             echo ""
           '';
         };

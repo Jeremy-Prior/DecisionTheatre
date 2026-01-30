@@ -60,6 +60,34 @@ All artifacts are collected and published as a GitHub Release with:
 - Merged SHA256 checksums file
 - Auto-generated release notes with installation instructions
 
+## Building Packages Locally
+
+You can build release packages locally using `make packages`. This builds the frontend and docs, then cross-compiles for each platform:
+
+```bash
+# All platforms (linux native + windows cross-compile)
+make packages
+
+# Single platform
+make packages-linux
+make packages-windows
+make packages-darwin   # macOS only (requires running on macOS)
+```
+
+Output in `dist/`:
+
+| Platform | Artefacts | Requirements |
+|----------|-----------|-------------|
+| Linux | `.tar.gz`, `.deb`, `.rpm` | Native build; `nfpm` for deb/rpm (in nix devShell) |
+| Windows | `.zip`, `.msi` | `mingw-w64` cross-compiler (in nix devShell); WiX v4+ for `.msi` |
+| macOS | `.tar.gz` or `.dmg` | Must run on macOS |
+
+The script (`scripts/build-packages.sh`) accepts `--platform`, `--arch`, and `--version` flags for fine-grained control:
+
+```bash
+./scripts/build-packages.sh --platform windows --arch amd64 --version 0.2.0
+```
+
 ## Building a Data Pack
 
 Data packs are built locally (not in CI) because they contain large binary data files:
