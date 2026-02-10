@@ -114,6 +114,11 @@ export const SCENARIOS: ScenarioInfo[] = [
 // Project Management Types
 // ============================================================================
 
+export interface MapExtent {
+  center: [number, number]; // [lng, lat]
+  zoom: number;
+}
+
 export interface Project {
   id: string;
   title: string;
@@ -124,6 +129,7 @@ export interface Project {
   paneStates: PaneStates;
   layoutMode: LayoutMode;
   focusedPane: number;
+  mapExtent?: MapExtent;
 }
 
 // Identify result: scenario -> attribute -> value
@@ -132,7 +138,7 @@ export type IdentifyResult = {
   data: Record<string, Record<string, number>>;
 } | null;
 
-export type AppPage = 'landing' | 'about' | 'projects' | 'create' | 'map';
+export type AppPage = 'landing' | 'about' | 'projects' | 'create' | 'map' | 'explore';
 
 const STORAGE_CURRENT_PROJECT_KEY = 'dt-current-project';
 const STORAGE_CURRENT_PAGE_KEY = 'dt-current-page';
@@ -156,7 +162,7 @@ export function saveCurrentProject(projectId: string | null): void {
 export function loadCurrentPage(): AppPage {
   try {
     const raw = localStorage.getItem(STORAGE_CURRENT_PAGE_KEY);
-    if (raw === 'landing' || raw === 'about' || raw === 'projects' || raw === 'create' || raw === 'map') {
+    if (raw === 'landing' || raw === 'about' || raw === 'projects' || raw === 'create' || raw === 'map' || raw === 'explore') {
       return raw;
     }
   } catch { /* default */ }

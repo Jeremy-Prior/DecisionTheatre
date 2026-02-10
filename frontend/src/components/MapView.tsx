@@ -3,7 +3,7 @@ import { Box, IconButton, Tooltip, Flex, Text, Icon, VStack, Button } from '@cha
 import { FiSliders, FiMap, FiInfo, FiBox } from 'react-icons/fi';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { ComparisonState, Scenario, IdentifyResult } from '../types';
+import type { ComparisonState, Scenario, IdentifyResult, MapExtent } from '../types';
 import { SCENARIOS } from '../types';
 import { registerMap, unregisterMap } from '../hooks/useMapSync';
 
@@ -12,6 +12,7 @@ interface MapViewProps {
   paneIndex: number;
   onOpenSettings: () => void;
   onIdentify?: (result: IdentifyResult) => void;
+  onMapExtentChange?: (extent: MapExtent) => void;
 }
 
 // Prism colour gradient for data visualization
@@ -158,7 +159,7 @@ function computeMinMax(
   return { min, max };
 }
 
-function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify }: MapViewProps) {
+function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify, onMapExtentChange }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const leftMapRef = useRef<maplibregl.Map | null>(null);
   const rightMapRef = useRef<maplibregl.Map | null>(null);
@@ -184,6 +185,10 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
   isIdentifyModeRef.current = isIdentifyMode;
   const onIdentifyRef = useRef(onIdentify);
   onIdentifyRef.current = onIdentify;
+
+  // Store map extent change callback in ref
+  const onMapExtentChangeRef = useRef(onMapExtentChange);
+  onMapExtentChangeRef.current = onMapExtentChange;
 
   // Debounce timer for choropleth fetching
   const fetchTimerRef = useRef<number | null>(null);
@@ -574,7 +579,17 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     rightMap.on('click', (e) => handleIdentifyClick(rightMap, e));
 
     // Fetch new choropleth data when map moves (debounced)
-    leftMap.on('moveend', () => debouncedApplyColors());
+    leftMap.on('moveend', () => {
+      debouncedApplyColors();
+      // Report map extent changes
+      if (onMapExtentChangeRef.current) {
+        const center = leftMap.getCenter();
+        onMapExtentChangeRef.current({
+          center: [center.lng, center.lat],
+          zoom: leftMap.getZoom(),
+        });
+      }
+    });
     leftMap.on('zoomend', () => debouncedApplyColors());
 
     // When maps are loaded, mark ready and apply initial colours

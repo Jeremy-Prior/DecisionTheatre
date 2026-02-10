@@ -8,7 +8,7 @@ import {
   useColorModeValue,
 } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
-import { FiInfo, FiFolderPlus } from 'react-icons/fi';
+import { FiInfo, FiCompass } from 'react-icons/fi';
 import type { AppPage } from '../types';
 
 const MotionBox = motion(Box);
@@ -148,8 +148,8 @@ function LandingPage({ onNavigate }: LandingPageProps) {
                 <Button
                   size="lg"
                   colorScheme="brand"
-                  leftIcon={<FiFolderPlus />}
-                  onClick={() => onNavigate('projects')}
+                  leftIcon={<FiCompass />}
+                  onClick={() => onNavigate('explore')}
                   _hover={{
                     transform: 'translateY(-2px)',
                     boxShadow: '0 10px 30px -10px rgba(43, 176, 237, 0.5)',
@@ -157,7 +157,7 @@ function LandingPage({ onNavigate }: LandingPageProps) {
                   transition="all 0.2s"
                   px={8}
                 >
-                  Projects
+                  Explore
                 </Button>
               </Flex>
             </VStack>

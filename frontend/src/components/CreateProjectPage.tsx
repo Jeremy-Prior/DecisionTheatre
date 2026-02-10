@@ -177,6 +177,7 @@ function CreateProjectPage({ onNavigate, onProjectCreated, cloneFrom }: CreatePr
         paneStates: cloneFrom?.paneStates || undefined,
         layoutMode: cloneFrom?.layoutMode || undefined,
         focusedPane: cloneFrom?.focusedPane || undefined,
+        mapExtent: cloneFrom?.mapExtent || undefined,
       };
 
       const response = await fetch('/api/projects', {

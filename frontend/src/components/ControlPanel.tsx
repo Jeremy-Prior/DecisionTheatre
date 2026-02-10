@@ -17,8 +17,9 @@ import {
   Tr,
   Th,
   Td,
+  Button,
 } from '@chakra-ui/react';
-import { FiChevronRight, FiInfo, FiX } from 'react-icons/fi';
+import { FiChevronRight, FiInfo, FiX, FiFolderPlus } from 'react-icons/fi';
 import { useColumns } from '../hooks/useApi';
 import { PRISM_CSS_GRADIENT } from './MapView';
 import type { Scenario, ComparisonState, IdentifyResult } from '../types';
@@ -33,6 +34,8 @@ interface ControlPanelProps {
   paneIndex: number | null;
   identifyResult?: IdentifyResult;
   onClearIdentify?: () => void;
+  isExploreMode?: boolean;
+  onNavigateToCreate?: () => void;
 }
 
 function ScenarioSelector({
@@ -107,6 +110,8 @@ function ControlPanel({
   paneIndex,
   identifyResult,
   onClearIdentify,
+  isExploreMode,
+  onNavigateToCreate,
 }: ControlPanelProps) {
   const { columns, loading: columnsLoading } = useColumns();
   const bgColor = useColorModeValue('gray.50', 'gray.800');
@@ -341,6 +346,32 @@ function ControlPanel({
                     </Tbody>
                   </Table>
                 </Box>
+              </Box>
+            </>
+          )}
+
+          {/* Create Project button - shown in explore mode */}
+          {isExploreMode && onNavigateToCreate && (
+            <>
+              <Divider />
+              <Box>
+                <Button
+                  colorScheme="brand"
+                  size="lg"
+                  width="100%"
+                  leftIcon={<FiFolderPlus />}
+                  onClick={onNavigateToCreate}
+                  _hover={{
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 10px 30px -10px rgba(43, 176, 237, 0.5)',
+                  }}
+                  transition="all 0.2s"
+                >
+                  Create Project
+                </Button>
+                <Text fontSize="xs" color="gray.500" mt={2} textAlign="center">
+                  Save current view and settings as a new project
+                </Text>
               </Box>
             </>
           )}

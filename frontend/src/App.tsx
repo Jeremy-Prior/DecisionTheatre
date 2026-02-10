@@ -10,7 +10,7 @@ import AboutPage from './components/AboutPage';
 import ProjectsPage from './components/ProjectsPage';
 import CreateProjectPage from './components/CreateProjectPage';
 import { useServerInfo } from './hooks/useApi';
-import type { Scenario, LayoutMode, PaneStates, ComparisonState, AppPage, Project, IdentifyResult } from './types';
+import type { Scenario, LayoutMode, PaneStates, ComparisonState, AppPage, Project, IdentifyResult, MapExtent } from './types';
 import {
   loadPaneStates,
   savePaneStates,
@@ -38,6 +38,8 @@ function App() {
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(loadCurrentProject);
   const [cloneFromProject, setCloneFromProject] = useState<Project | null>(null);
   const [identifyResult, setIdentifyResult] = useState<IdentifyResult>(null);
+  const [mapExtent, setMapExtent] = useState<MapExtent | null>(null);
+  const [isExploreMode, setIsExploreMode] = useState(false);
   const { info } = useServerInfo();
 
   // Persist state changes
@@ -49,9 +51,22 @@ function App() {
 
   // Navigate to a page
   const handleNavigate = useCallback((page: AppPage) => {
-    setCurrentPage(page);
-    if (page !== 'create') {
-      setCloneFromProject(null);
+    if (page === 'explore') {
+      // Explore mode: go to map with side panel open, no project context
+      setCurrentProjectId(null);
+      setIsExploreMode(true);
+      setLayoutMode('single');
+      setFocusedPane(0);
+      setIndicatorPaneIndex(0); // Open side panel
+      setCurrentPage('map');
+    } else {
+      setCurrentPage(page);
+      if (page !== 'create') {
+        setCloneFromProject(null);
+      }
+      if (page !== 'map') {
+        setIsExploreMode(false);
+      }
     }
   }, []);
 
@@ -129,6 +144,30 @@ function App() {
       setIndicatorPaneIndex(focusedPane);
     }
   }, [indicatorPaneIndex, focusedPane]);
+
+  // Track map extent changes
+  const handleMapExtentChange = useCallback((extent: MapExtent) => {
+    setMapExtent(extent);
+  }, []);
+
+  // Navigate to create project page from explore mode with current state
+  const handleNavigateToCreate = useCallback(() => {
+    // Create a pseudo-project with current explore state
+    const exploreProject: Project = {
+      id: '',
+      title: 'New Exploration',
+      description: '',
+      thumbnail: null,
+      paneStates,
+      layoutMode,
+      focusedPane,
+      mapExtent: mapExtent || undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setCloneFromProject(exploreProject);
+    setCurrentPage('create');
+  }, [paneStates, layoutMode, focusedPane, mapExtent]);
 
   const isIndicatorOpen = indicatorPaneIndex !== null;
 
@@ -239,6 +278,7 @@ function App() {
             onFocusPane={handleFocusPane}
             onGoQuad={handleGoQuad}
             onIdentify={handleIdentify}
+            onMapExtentChange={handleMapExtentChange}
           />
         </Box>
 
@@ -252,6 +292,8 @@ function App() {
           paneIndex={indicatorPaneIndex}
           identifyResult={identifyResult}
           onClearIdentify={() => setIdentifyResult(null)}
+          isExploreMode={isExploreMode}
+          onNavigateToCreate={handleNavigateToCreate}
         />
       </Flex>
 
