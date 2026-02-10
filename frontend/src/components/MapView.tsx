@@ -428,18 +428,18 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     const container = mapContainerRef.current;
 
     // Create the left and right map containers
-    // Left container - clips at the slider position
+    // Left container - clips at the slider position, z-index:1 to stay above any React elements
     const leftClipContainer = document.createElement('div');
-    leftClipContainer.style.cssText = 'position:absolute;top:0;left:0;width:50%;height:100%;overflow:hidden;';
+    leftClipContainer.style.cssText = 'position:absolute;top:0;left:0;width:50%;height:100%;overflow:hidden;z-index:1;';
     leftClipContainer.id = 'map-left-clip';
 
     const leftContainer = document.createElement('div');
     leftContainer.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
     leftContainer.id = 'map-left';
 
-    // Right container - clips at the slider position
+    // Right container - clips at the slider position, z-index:2 to be above left container
     const rightClipContainer = document.createElement('div');
-    rightClipContainer.style.cssText = 'position:absolute;top:0;right:0;width:50%;height:100%;overflow:hidden;';
+    rightClipContainer.style.cssText = 'position:absolute;top:0;right:0;width:50%;height:100%;overflow:hidden;z-index:2;';
     rightClipContainer.id = 'map-right-clip';
 
     const rightContainer = document.createElement('div');
@@ -570,7 +570,7 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     // Load style from server (mbtiles base layers)
     const styleUrl = window.location.origin + '/data/style.json';
 
-    // Create left map
+    // Create left map with all interactions enabled
     const leftMap = new maplibregl.Map({
       container: leftContainer,
       style: styleUrl,
@@ -579,11 +579,16 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
       attributionControl: false,
       scrollZoom: true,
       dragPan: true,
+      dragRotate: true,
       doubleClickZoom: true,
+      boxZoom: true,
+      keyboard: true,
+      touchZoomRotate: true,
+      touchPitch: true,
     });
     leftMap.addControl(new maplibregl.NavigationControl(), 'bottom-left');
 
-    // Create right map
+    // Create right map with all interactions enabled
     const rightMap = new maplibregl.Map({
       container: rightContainer,
       style: styleUrl,
@@ -592,7 +597,12 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
       attributionControl: false,
       scrollZoom: true,
       dragPan: true,
+      dragRotate: true,
       doubleClickZoom: true,
+      boxZoom: true,
+      keyboard: true,
+      touchZoomRotate: true,
+      touchPitch: true,
     });
 
     // Initial sizing of map containers
