@@ -15,6 +15,12 @@ interface MapViewProps {
   onMapExtentChange?: (extent: MapExtent) => void;
 }
 
+// Layer IDs for choropleth
+const CHOROPLETH_LAYER_LEFT = 'choropleth-left';
+const CHOROPLETH_LAYER_RIGHT = 'choropleth-right';
+const CHOROPLETH_3D_LEFT = 'choropleth-left-3d';
+const CHOROPLETH_3D_RIGHT = 'choropleth-right-3d';
+
 // Prism colour gradient for data visualization
 // Spectrum: violet -> indigo -> blue -> cyan -> green -> yellow -> orange -> red
 const PRISM_STOPS: [number, string][] = [
@@ -367,12 +373,33 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
   }, [isIdentifyMode]);
 
   // Handle identify click via MapLibre queryRenderedFeatures
-  const handleIdentifyClick = useCallback((map: maplibregl.Map, e: maplibregl.MapMouseEvent) => {
+  const handleIdentifyClick = useCallback((map: maplibregl.Map, e: maplibregl.MapMouseEvent, side: 'left' | 'right') => {
     if (!isIdentifyModeRef.current || !onIdentifyRef.current) return;
 
-    // Query the catchments outline layer for features at the click point
+    // Build list of layers to query - include choropleth layers if they exist
+    const layersToQuery: string[] = [];
+
+    // Always try the catchments outline layer
+    if (map.getLayer('Catchments Outlines')) {
+      layersToQuery.push('Catchments Outlines');
+    }
+
+    // Add choropleth layers based on which side was clicked
+    const choroplethLayer = side === 'left' ? CHOROPLETH_LAYER_LEFT : CHOROPLETH_LAYER_RIGHT;
+    const choropleth3dLayer = side === 'left' ? CHOROPLETH_3D_LEFT : CHOROPLETH_3D_RIGHT;
+
+    if (map.getLayer(choroplethLayer)) {
+      layersToQuery.push(choroplethLayer);
+    }
+    if (map.getLayer(choropleth3dLayer)) {
+      layersToQuery.push(choropleth3dLayer);
+    }
+
+    if (layersToQuery.length === 0) return;
+
+    // Query for features at the click point
     const features = map.queryRenderedFeatures(e.point, {
-      layers: ['Catchments Outlines'],
+      layers: layersToQuery,
     });
 
     if (features.length === 0) return;
@@ -401,44 +428,58 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     const container = mapContainerRef.current;
 
     // Create the left and right map containers
+    // Left container - clips at the slider position
+    const leftClipContainer = document.createElement('div');
+    leftClipContainer.style.cssText = 'position:absolute;top:0;left:0;width:50%;height:100%;overflow:hidden;';
+    leftClipContainer.id = 'map-left-clip';
+
     const leftContainer = document.createElement('div');
     leftContainer.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
     leftContainer.id = 'map-left';
+
+    // Right container - clips at the slider position
+    const rightClipContainer = document.createElement('div');
+    rightClipContainer.style.cssText = 'position:absolute;top:0;right:0;width:50%;height:100%;overflow:hidden;';
+    rightClipContainer.id = 'map-right-clip';
 
     const rightContainer = document.createElement('div');
     rightContainer.style.cssText = 'position:absolute;top:0;height:100%;';
     rightContainer.id = 'map-right';
 
-    // Create the clip container for the right map
-    const clipContainer = document.createElement('div');
-    clipContainer.style.cssText = 'position:absolute;top:0;right:0;width:50%;height:100%;overflow:hidden;z-index:1;';
-    clipContainer.id = 'map-clip';
-    clipContainer.appendChild(rightContainer);
+    // Append containers
+    leftClipContainer.appendChild(leftContainer);
+    rightClipContainer.appendChild(rightContainer);
 
-    // Size the right map to match the full parent width, offset left
-    function updateRightMapSize() {
+    // Size both maps to match the full parent width, with proper offsets
+    function updateMapSizes() {
       const parentWidth = container.offsetWidth;
-      const clipWidth = clipContainer.offsetWidth;
+      const rightClipWidth = rightClipContainer.offsetWidth;
+
+      // Left map: full width, positioned at 0
+      leftContainer.style.width = parentWidth + 'px';
+
+      // Right map: full width, offset to align with visible portion
       rightContainer.style.width = parentWidth + 'px';
-      rightContainer.style.left = -(parentWidth - clipWidth) + 'px';
+      rightContainer.style.left = -(parentWidth - rightClipWidth) + 'px';
     }
 
-    container.appendChild(leftContainer);
-    container.appendChild(clipContainer);
+    container.appendChild(leftClipContainer);
+    container.appendChild(rightClipContainer);
 
-    // Create the slider
+    // Create the slider with touch-action to prevent browser gestures
     const slider = document.createElement('div');
     slider.style.cssText = `
       position:absolute;
       top:0;
       left:50%;
-      width:4px;
+      width:12px;
       height:100%;
       background:white;
       z-index:10;
       cursor:ew-resize;
       box-shadow:0 0 8px rgba(0,0,0,0.4);
       transform:translateX(-50%);
+      touch-action:none;
     `;
 
     // Slider handle
@@ -463,7 +504,7 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     slider.appendChild(handle);
     container.appendChild(slider);
     sliderRef.current = slider;
-    compareContainerRef.current = clipContainer;
+    compareContainerRef.current = rightClipContainer;
 
     // Scenario labels on each side
     const leftLabel = document.createElement('div');
@@ -554,8 +595,8 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
       doubleClickZoom: true,
     });
 
-    // Initial sizing of right map container
-    updateRightMapSize();
+    // Initial sizing of map containers
+    updateMapSizes();
 
     // Sync the two maps
     let syncing = false;
@@ -574,9 +615,9 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     leftMap.on('move', () => syncMaps(leftMap, rightMap));
     rightMap.on('move', () => syncMaps(rightMap, leftMap));
 
-    // Identify click handlers
-    leftMap.on('click', (e) => handleIdentifyClick(leftMap, e));
-    rightMap.on('click', (e) => handleIdentifyClick(rightMap, e));
+    // Identify click handlers - pass side info for correct layer querying
+    leftMap.on('click', (e) => handleIdentifyClick(leftMap, e, 'left'));
+    rightMap.on('click', (e) => handleIdentifyClick(rightMap, e, 'right'));
 
     // Fetch new choropleth data when map moves (debounced)
     leftMap.on('moveend', () => {
@@ -608,33 +649,52 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     // Register the left map for cross-pane sync
     const syncId = registerMap(leftMap);
 
-    // Slider drag handling
-    function onPointerDown(e: PointerEvent) {
+    // Slider drag handling with proper isolation from map events
+    let sliderPointerId: number | null = null;
+
+    function onSliderPointerDown(e: PointerEvent) {
+      e.preventDefault();
+      e.stopPropagation();
       isDragging.current = true;
+      sliderPointerId = e.pointerId;
       slider.setPointerCapture(e.pointerId);
+      // Disable map interactions while dragging slider
+      leftMap.dragPan.disable();
+      rightMap.dragPan.disable();
     }
 
-    function onPointerMove(e: PointerEvent) {
-      if (!isDragging.current) return;
+    function onSliderPointerMove(e: PointerEvent) {
+      if (!isDragging.current || e.pointerId !== sliderPointerId) return;
+      e.preventDefault();
+
       const rect = container.getBoundingClientRect();
-      const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+      const x = Math.max(20, Math.min(e.clientX - rect.left, rect.width - 20));
       const percent = (x / rect.width) * 100;
 
       slider.style.left = `${percent}%`;
-      clipContainer.style.width = `${100 - percent}%`;
-      updateRightMapSize();
+      // Update both clip containers
+      leftClipContainer.style.width = `${percent}%`;
+      rightClipContainer.style.width = `${100 - percent}%`;
+      updateMapSizes();
 
+      // Trigger resize for both maps
       leftMap.resize();
       rightMap.resize();
     }
 
-    function onPointerUp() {
+    function onSliderPointerUp(e: PointerEvent) {
+      if (e.pointerId !== sliderPointerId) return;
       isDragging.current = false;
+      sliderPointerId = null;
+      // Re-enable map interactions
+      leftMap.dragPan.enable();
+      rightMap.dragPan.enable();
     }
 
-    slider.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp);
+    slider.addEventListener('pointerdown', onSliderPointerDown);
+    slider.addEventListener('pointermove', onSliderPointerMove);
+    slider.addEventListener('pointerup', onSliderPointerUp);
+    slider.addEventListener('pointercancel', onSliderPointerUp);
 
     return () => {
       mapsReady.current = { left: false, right: false };
@@ -642,9 +702,10 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
         clearTimeout(fetchTimerRef.current);
       }
       unregisterMap(syncId);
-      slider.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
+      slider.removeEventListener('pointerdown', onSliderPointerDown);
+      slider.removeEventListener('pointermove', onSliderPointerMove);
+      slider.removeEventListener('pointerup', onSliderPointerUp);
+      slider.removeEventListener('pointercancel', onSliderPointerUp);
       leftMap.remove();
       rightMap.remove();
     };
