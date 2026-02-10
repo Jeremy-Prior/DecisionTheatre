@@ -237,14 +237,26 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
       // Compute shared min/max for consistent coloring
       const { min, max } = computeMinMax(leftData, rightData, c.attribute);
 
-      // Apply to left map
+      // Apply to left map - verify the map is ready
       if (leftData && leftData.features.length > 0) {
-        applyChoroplethLayer(leftMap, 'left', leftData, c.attribute, min, max, extruded);
+        if (leftMap.loaded()) {
+          applyChoroplethLayer(leftMap, 'left', leftData, c.attribute, min, max, extruded);
+        } else {
+          leftMap.once('idle', () => {
+            applyChoroplethLayer(leftMap, 'left', leftData, c.attribute, min, max, extruded);
+          });
+        }
       }
 
-      // Apply to right map
+      // Apply to right map - verify the map is ready
       if (rightData && rightData.features.length > 0) {
-        applyChoroplethLayer(rightMap, 'right', rightData, c.attribute, min, max, extruded);
+        if (rightMap.loaded()) {
+          applyChoroplethLayer(rightMap, 'right', rightData, c.attribute, min, max, extruded);
+        } else {
+          rightMap.once('idle', () => {
+            applyChoroplethLayer(rightMap, 'right', rightData, c.attribute, min, max, extruded);
+          });
+        }
       }
     } catch (err) {
       console.error('Failed to apply choropleth:', err);
@@ -288,36 +300,43 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     // Remove existing layers and source
     removeChoroplethLayers(map, side);
 
-    // Add the GeoJSON source
-    map.addSource(sourceId, {
-      type: 'geojson',
-      data: data as unknown as GeoJSON.FeatureCollection,
-    });
+    try {
+      // Add the GeoJSON source
+      map.addSource(sourceId, {
+        type: 'geojson',
+        data: data as unknown as GeoJSON.FeatureCollection,
+      });
 
-    if (extruded) {
-      // 3D fill-extrusion layer
-      map.addLayer({
-        id: layer3dId,
-        type: 'fill-extrusion',
-        source: sourceId,
-        paint: {
-          'fill-extrusion-color': buildFillColorExpression(attribute, min, max),
-          'fill-extrusion-height': buildExtrusionExpression(attribute, min, max),
-          'fill-extrusion-base': 0,
-          'fill-extrusion-opacity': 0.8,
-        },
-      });
-    } else {
-      // 2D fill layer
-      map.addLayer({
-        id: layerId,
-        type: 'fill',
-        source: sourceId,
-        paint: {
-          'fill-color': buildFillColorExpression(attribute, min, max),
-          'fill-opacity': 0.75,
-        },
-      });
+      if (extruded) {
+        // 3D fill-extrusion layer
+        map.addLayer({
+          id: layer3dId,
+          type: 'fill-extrusion',
+          source: sourceId,
+          paint: {
+            'fill-extrusion-color': buildFillColorExpression(attribute, min, max),
+            'fill-extrusion-height': buildExtrusionExpression(attribute, min, max),
+            'fill-extrusion-base': 0,
+            'fill-extrusion-opacity': 0.8,
+          },
+        });
+      } else {
+        // 2D fill layer
+        map.addLayer({
+          id: layerId,
+          type: 'fill',
+          source: sourceId,
+          paint: {
+            'fill-color': buildFillColorExpression(attribute, min, max),
+            'fill-opacity': 0.75,
+          },
+        });
+      }
+
+      // Force a re-render to ensure the layer is drawn
+      map.triggerRepaint();
+    } catch (err) {
+      console.error(`Error adding choropleth layer for ${side}:`, err);
     }
   }
 
@@ -428,22 +447,24 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     const container = mapContainerRef.current;
 
     // Create the left and right map containers
-    // Left container - clips at the slider position, z-index:1 to stay above any React elements
+    // Left container - clips at the slider position
+    // Use z-index:2 so it renders above any React overlay elements
     const leftClipContainer = document.createElement('div');
-    leftClipContainer.style.cssText = 'position:absolute;top:0;left:0;width:50%;height:100%;overflow:hidden;z-index:1;';
+    leftClipContainer.style.cssText = 'position:absolute;top:0;left:0;width:50%;height:100%;overflow:hidden;z-index:2;';
     leftClipContainer.id = 'map-left-clip';
 
     const leftContainer = document.createElement('div');
     leftContainer.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
     leftContainer.id = 'map-left';
 
-    // Right container - clips at the slider position, z-index:2 to be above left container
+    // Right container - clips at the slider position
+    // Use z-index:2 so it renders above any React overlay elements (same level as left)
     const rightClipContainer = document.createElement('div');
     rightClipContainer.style.cssText = 'position:absolute;top:0;right:0;width:50%;height:100%;overflow:hidden;z-index:2;';
     rightClipContainer.id = 'map-right-clip';
 
     const rightContainer = document.createElement('div');
-    rightContainer.style.cssText = 'position:absolute;top:0;height:100%;';
+    rightContainer.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
     rightContainer.id = 'map-right';
 
     // Append containers
@@ -570,6 +591,9 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     // Load style from server (mbtiles base layers)
     const styleUrl = window.location.origin + '/data/style.json';
 
+    // Set initial sizes BEFORE creating maps so they initialize with correct dimensions
+    updateMapSizes();
+
     // Create left map with all interactions enabled
     const leftMap = new maplibregl.Map({
       container: leftContainer,
@@ -643,13 +667,19 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     });
     leftMap.on('zoomend', () => debouncedApplyColors());
 
-    // When maps are loaded, mark ready and apply initial colours
+    // When maps are loaded, mark ready, resize, and apply initial colours
     leftMap.on('load', () => {
       mapsReady.current.left = true;
+      // Ensure proper sizing after load
+      updateMapSizes();
+      leftMap.resize();
       if (mapsReady.current.right) applyColors();
     });
     rightMap.on('load', () => {
       mapsReady.current.right = true;
+      // Ensure proper sizing after load
+      updateMapSizes();
+      rightMap.resize();
       if (mapsReady.current.left) applyColors();
     });
 

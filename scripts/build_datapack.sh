@@ -58,6 +58,122 @@ elif [ -f "$DATA_DIR/metadata.csv" ]; then
         "$DATA_DIR/metadata.csv"
 fi
 
+# Normalize column names to ensure both tables have identical structure
+# The input CSVs may have different naming conventions (dots vs dashes/spaces)
+# We normalize to dots (.) as the separator character
+echo "Normalizing column names..."
+python3 - "$OUTPUT" <<'NORMPY'
+import sqlite3
+import sys
+import re
+
+gpkg_path = sys.argv[1]
+conn = sqlite3.connect(gpkg_path)
+cur = conn.cursor()
+
+def normalize_column_name(name):
+    """Normalize column name: replace dashes, spaces, apostrophes, etc. with dots."""
+    # Rename the main catchID column to 'catchment_id'
+    if name == 'catchID':
+        return 'catchment_id'
+    # Drop duplicate sp_current.catchID and sp_reference$catchID columns (they have same data as catchID)
+    if name in ('sp_current.catchID', 'sp_reference$catchID', 'sp_reference.catchID'):
+        return None  # Signal to drop this column
+
+    # Replace ' - ' with '.'
+    # Replace '-' with '.'
+    # Replace ' ' with '.'
+    result = name.replace(' - ', '.')
+    result = result.replace('-', '.')
+    result = result.replace(' ', '.')
+    # Also replace '$' with '.' for the sp_reference$catchID column
+    result = result.replace('$', '.')
+    # Handle apostrophe differences: 's vs .s (e.g., "Salt's" vs "Salt.s")
+    # Normalize ' to . and also handle unicode apostrophes
+    result = result.replace("'s", '.s')
+    result = result.replace("'", '.')
+    # Handle forward slashes
+    result = result.replace('/', '.')
+    # Handle + at end (Suids+)
+    result = result.replace('+', '.')
+    # Normalize multiple dots to a single dot (current.csv uses ... vs reference.csv uses .)
+    # This handles cases like "browser.frugivores...closed" vs "browser.frugivores.closed"
+    import re
+    result = re.sub(r'\.{2,}', '.', result)
+    return result
+
+def rename_columns(table_name):
+    """Rename columns in a table to use normalized names. Drops columns where normalize returns None."""
+    cur.execute(f"PRAGMA table_info({table_name})")
+    columns = [(row[1], row[2]) for row in cur.fetchall()]  # (name, type)
+
+    renames = []
+    drops = []
+    for col_name, col_type in columns:
+        new_name = normalize_column_name(col_name)
+        if new_name is None:
+            drops.append(col_name)
+        elif new_name != col_name:
+            renames.append((col_name, new_name))
+
+    if not renames and not drops:
+        print(f"  {table_name}: No columns need changes")
+        return
+
+    # SQLite doesn't support ALTER TABLE RENAME COLUMN in older versions
+    # We need to recreate the table with new column names
+    print(f"  {table_name}: Renaming {len(renames)} columns, dropping {len(drops)} columns...")
+
+    # Build column mapping (excluding dropped columns)
+    col_map = {old: new for old, new in renames}
+    new_columns = []
+    select_parts = []
+    for col_name, col_type in columns:
+        if col_name in drops:
+            continue  # Skip dropped columns
+        new_name = col_map.get(col_name, col_name)
+        new_columns.append(f'"{new_name}" {col_type}')
+        select_parts.append(f'"{col_name}" as "{new_name}"')
+
+    # Create new table, copy data, drop old, rename new
+    cur.execute(f"CREATE TABLE {table_name}_new ({', '.join(new_columns)})")
+    cur.execute(f"INSERT INTO {table_name}_new SELECT {', '.join(select_parts)} FROM {table_name}")
+    cur.execute(f"DROP TABLE {table_name}")
+    cur.execute(f"ALTER TABLE {table_name}_new RENAME TO {table_name}")
+    conn.commit()
+
+    for old, new in renames[:5]:  # Show first 5
+        print(f"    {old} -> {new}")
+    if len(renames) > 5:
+        print(f"    ... and {len(renames) - 5} more")
+
+rename_columns("scenario_current")
+rename_columns("scenario_reference")
+
+# Verify both tables now have matching column names
+cur.execute("PRAGMA table_info(scenario_current)")
+current_cols = sorted([row[1] for row in cur.fetchall()])
+
+cur.execute("PRAGMA table_info(scenario_reference)")
+reference_cols = sorted([row[1] for row in cur.fetchall()])
+
+# Check for mismatches
+if current_cols == reference_cols:
+    print(f"  Verified: Both tables have {len(current_cols)} matching columns")
+else:
+    current_set = set(current_cols)
+    reference_set = set(reference_cols)
+    only_current = current_set - reference_set
+    only_reference = reference_set - current_set
+    if only_current:
+        print(f"  WARNING: Columns only in scenario_current: {list(only_current)[:5]}")
+    if only_reference:
+        print(f"  WARNING: Columns only in scenario_reference: {list(only_reference)[:5]}")
+
+conn.close()
+print("  Done normalizing column names")
+NORMPY
+
 # Create index on catchID columns for fast joins
 # First, convert catchID to integer for proper indexing
 echo "Creating indexes..."
@@ -75,14 +191,14 @@ DROP TRIGGER IF EXISTS trigger_delete_feature_count_catchments_lev12;
 EOF
 
 sqlite3 "$OUTPUT" <<EOF
--- Add an integer catchID column for proper indexing
-ALTER TABLE scenario_current ADD COLUMN catchID_int INTEGER;
-UPDATE scenario_current SET catchID_int = CAST(catchID AS INTEGER);
-CREATE INDEX IF NOT EXISTS idx_current_catchid_int ON scenario_current(catchID_int);
+-- Add an integer catchment_id column for proper indexing
+ALTER TABLE scenario_current ADD COLUMN catchment_id_int INTEGER;
+UPDATE scenario_current SET catchment_id_int = CAST(catchment_id AS INTEGER);
+CREATE INDEX IF NOT EXISTS idx_current_catchment_id_int ON scenario_current(catchment_id_int);
 
-ALTER TABLE scenario_reference ADD COLUMN catchID_int INTEGER;
-UPDATE scenario_reference SET catchID_int = CAST(catchID AS INTEGER);
-CREATE INDEX IF NOT EXISTS idx_reference_catchid_int ON scenario_reference(catchID_int);
+ALTER TABLE scenario_reference ADD COLUMN catchment_id_int INTEGER;
+UPDATE scenario_reference SET catchment_id_int = CAST(catchment_id AS INTEGER);
+CREATE INDEX IF NOT EXISTS idx_reference_catchment_id_int ON scenario_reference(catchment_id_int);
 
 -- Also create an integer index on HYBAS_ID in catchments_lev12
 ALTER TABLE catchments_lev12 ADD COLUMN HYBAS_ID_int INTEGER;

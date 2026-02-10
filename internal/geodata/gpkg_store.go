@@ -86,10 +86,12 @@ func (s *GpkgStore) loadColumns() error {
 		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
 			continue
 		}
-		// Skip the ID column
-		if name != "catchID" && name != "fid" && name != "ogc_fid" {
-			columns = append(columns, name)
+		// Skip internal/ID columns - keep only data attributes
+		if name == "catchment_id" || name == "fid" || name == "ogc_fid" ||
+			name == "catchment_id_int" {
+			continue
 		}
+		columns = append(columns, name)
 	}
 
 	s.mu.Lock()
@@ -125,7 +127,7 @@ func (s *GpkgStore) QueryCatchments(scenario, attribute string, minx, miny, maxx
 			c.geojson,
 			s."%s" as value
 		FROM catchments_lev12 c
-		JOIN %s s ON c.HYBAS_ID_int = s.catchID_int
+		JOIN %s s ON c.HYBAS_ID_int = s.catchment_id_int
 		WHERE c.geojson IS NOT NULL
 		  AND c.fid IN (
 			SELECT id FROM rtree_catchments_lev12_geom
