@@ -85,4 +85,37 @@ make docs-serve
 
 Then open http://127.0.0.1:8000 in your browser.
 
-For architecture details, coding standards, testing, data preparation, and release procedures, see the **Developer Guide** section in the documentation.
+## 8. Prepare Application Data
+
+The application requires two data files: map tiles (MBTiles) and scenario data (GeoPackage).
+
+### Map Tiles
+
+Convert a GeoPackage with vector layers to MBTiles:
+
+```bash
+cd resources/mbtiles
+./gpkg_to_mbtiles.sh UoW_layers.gpkg catchments.mbtiles
+```
+
+### Scenario Datapack
+
+Build the scenario datapack from catchment geometries and CSV data:
+
+```bash
+# Place input files in data/
+# - catchments.gpkg (catchment geometries)
+# - current.csv (current scenario metrics)
+# - reference.csv (reference scenario metrics)
+# - metadata.csv (optional column descriptions)
+
+bash scripts/build_datapack.sh ./data
+```
+
+This creates `datapack.gpkg` with scenario tables, domain min/max for color scaling, and precomputed GeoJSON for fast API serving.
+
+For detailed documentation on data formats and the GeoPackage schema, see the **Data Preparation** section in the developer documentation.
+
+## Further Reading
+
+For architecture details, coding standards, testing, and release procedures, see the **Developer Guide** section in the documentation.

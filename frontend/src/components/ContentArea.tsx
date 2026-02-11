@@ -1,7 +1,7 @@
 import { Box } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ViewPane from './ViewPane';
-import type { LayoutMode, PaneStates, IdentifyResult, MapExtent } from '../types';
+import type { LayoutMode, PaneStates, IdentifyResult, MapExtent, MapStatistics } from '../types';
 
 interface ContentAreaProps {
   mode: LayoutMode;
@@ -11,6 +11,7 @@ interface ContentAreaProps {
   onGoQuad: () => void;
   onIdentify?: (result: IdentifyResult) => void;
   onMapExtentChange?: (extent: MapExtent) => void;
+  onStatisticsChange?: (stats: MapStatistics) => void;
 }
 
 const paneVariants = {
@@ -43,6 +44,7 @@ function ContentArea({
   onGoQuad,
   onIdentify,
   onMapExtentChange,
+  onStatisticsChange,
 }: ContentAreaProps) {
   const isQuad = mode === 'quad';
 
@@ -118,6 +120,7 @@ function ContentArea({
             onGoQuad={onGoQuad}
             onIdentify={onIdentify}
             onMapExtentChange={onMapExtentChange}
+            onStatisticsChange={onStatisticsChange}
           />
         </Box>
       )}

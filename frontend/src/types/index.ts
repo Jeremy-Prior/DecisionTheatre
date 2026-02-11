@@ -140,6 +140,27 @@ export type IdentifyResult = {
 
 export type AppPage = 'landing' | 'about' | 'projects' | 'create' | 'map' | 'explore';
 
+// Statistics for the visible zone (viewport)
+export interface ZoneStats {
+  min: number;
+  max: number;
+  mean: number;
+  count: number;
+}
+
+// Domain range for color scaling (global min/max across all scenarios)
+export interface DomainRange {
+  min: number;
+  max: number;
+}
+
+// Combined statistics from MapView
+export interface MapStatistics {
+  domainRange: DomainRange | null;
+  leftStats: ZoneStats | null;
+  rightStats: ZoneStats | null;
+}
+
 const STORAGE_CURRENT_PROJECT_KEY = 'dt-current-project';
 const STORAGE_CURRENT_PAGE_KEY = 'dt-current-page';
 

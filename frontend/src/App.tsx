@@ -10,7 +10,7 @@ import AboutPage from './components/AboutPage';
 import ProjectsPage from './components/ProjectsPage';
 import CreateProjectPage from './components/CreateProjectPage';
 import { useServerInfo } from './hooks/useApi';
-import type { Scenario, LayoutMode, PaneStates, ComparisonState, AppPage, Project, IdentifyResult, MapExtent } from './types';
+import type { Scenario, LayoutMode, PaneStates, ComparisonState, AppPage, Project, IdentifyResult, MapExtent, MapStatistics } from './types';
 import {
   loadPaneStates,
   savePaneStates,
@@ -40,6 +40,7 @@ function App() {
   const [identifyResult, setIdentifyResult] = useState<IdentifyResult>(null);
   const [mapExtent, setMapExtent] = useState<MapExtent | null>(null);
   const [isExploreMode, setIsExploreMode] = useState(false);
+  const [mapStatistics, setMapStatistics] = useState<MapStatistics | null>(null);
   const { info } = useServerInfo();
 
   // Persist state changes
@@ -148,6 +149,11 @@ function App() {
   // Track map extent changes
   const handleMapExtentChange = useCallback((extent: MapExtent) => {
     setMapExtent(extent);
+  }, []);
+
+  // Track map statistics changes
+  const handleStatisticsChange = useCallback((stats: MapStatistics) => {
+    setMapStatistics(stats);
   }, []);
 
   // Navigate to create project page from explore mode with current state
@@ -279,6 +285,7 @@ function App() {
             onGoQuad={handleGoQuad}
             onIdentify={handleIdentify}
             onMapExtentChange={handleMapExtentChange}
+            onStatisticsChange={handleStatisticsChange}
           />
         </Box>
 
@@ -294,6 +301,7 @@ function App() {
           onClearIdentify={() => setIdentifyResult(null)}
           isExploreMode={isExploreMode}
           onNavigateToCreate={handleNavigateToCreate}
+          mapStatistics={mapStatistics ?? undefined}
         />
       </Flex>
 

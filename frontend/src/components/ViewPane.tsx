@@ -3,7 +3,7 @@ import { Box, HStack, IconButton, Tooltip, useColorModeValue } from '@chakra-ui/
 import { FiBarChart2, FiMap, FiMaximize, FiGrid } from 'react-icons/fi';
 import MapView from './MapView';
 import ChartView from './ChartView';
-import type { ComparisonState, LayoutMode, IdentifyResult, MapExtent } from '../types';
+import type { ComparisonState, LayoutMode, IdentifyResult, MapExtent, MapStatistics } from '../types';
 import { SCENARIOS } from '../types';
 
 interface ViewPaneProps {
@@ -15,6 +15,7 @@ interface ViewPaneProps {
   onGoQuad: () => void;
   onIdentify?: (result: IdentifyResult) => void;
   onMapExtentChange?: (extent: MapExtent) => void;
+  onStatisticsChange?: (stats: MapStatistics) => void;
 }
 
 function ViewPane({
@@ -26,6 +27,7 @@ function ViewPane({
   onGoQuad,
   onIdentify,
   onMapExtentChange,
+  onStatisticsChange,
 }: ViewPaneProps) {
   const [isChartView, setIsChartView] = useState(false);
   const borderColor = useColorModeValue('gray.600', 'gray.600');
@@ -67,6 +69,7 @@ function ViewPane({
           onOpenSettings={() => onFocusPane(paneIndex)}
           onIdentify={onIdentify}
           onMapExtentChange={onMapExtentChange}
+          onStatisticsChange={onStatisticsChange}
         />
       </Box>
 

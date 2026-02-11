@@ -1,9 +1,9 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Box, IconButton, Tooltip, Flex, Text, Icon, VStack, Button } from '@chakra-ui/react';
+import { Box, IconButton, Tooltip, Icon, VStack, Button, Flex, Text } from '@chakra-ui/react';
 import { FiSliders, FiMap, FiInfo, FiBox } from 'react-icons/fi';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { ComparisonState, Scenario, IdentifyResult, MapExtent } from '../types';
+import type { ComparisonState, Scenario, IdentifyResult, MapExtent, MapStatistics, ZoneStats } from '../types';
 import { SCENARIOS } from '../types';
 import { registerMap, unregisterMap } from '../hooks/useMapSync';
 
@@ -13,6 +13,7 @@ interface MapViewProps {
   onOpenSettings: () => void;
   onIdentify?: (result: IdentifyResult) => void;
   onMapExtentChange?: (extent: MapExtent) => void;
+  onStatisticsChange?: (stats: MapStatistics) => void;
 }
 
 // Layer IDs for choropleth
@@ -65,6 +66,52 @@ interface ChoroplethData {
   // Domain min/max values for consistent color scaling across scenarios
   domain_min: number;
   domain_max: number;
+}
+
+/**
+ * Compute statistics (min, max, mean) for the visible zone features.
+ */
+function computeZoneStats(data: ChoroplethData, attribute: string): ZoneStats | null {
+  if (!data.features || data.features.length === 0) return null;
+
+  const values: number[] = [];
+  for (const feature of data.features) {
+    const val = feature.properties?.[attribute];
+    if (typeof val === 'number' && !isNaN(val)) {
+      values.push(val);
+    }
+  }
+
+  if (values.length === 0) return null;
+
+  let min = Infinity;
+  let max = -Infinity;
+  let sum = 0;
+
+  for (const v of values) {
+    if (v < min) min = v;
+    if (v > max) max = v;
+    sum += v;
+  }
+
+  return {
+    min,
+    max,
+    mean: sum / values.length,
+    count: values.length,
+  };
+}
+
+/**
+ * Format a number for display (compact notation for large numbers).
+ */
+export function formatNumber(n: number): string {
+  if (n === 0) return '0';
+  if (Math.abs(n) < 0.01) return n.toExponential(1);
+  if (Math.abs(n) < 1) return n.toFixed(2);
+  if (Math.abs(n) < 100) return n.toFixed(1);
+  if (Math.abs(n) < 10000) return n.toFixed(0);
+  return n.toLocaleString('en-US', { maximumFractionDigits: 0, notation: 'compact' });
 }
 
 /**
@@ -140,7 +187,7 @@ function buildExtrusionExpression(
   ] as maplibregl.ExpressionSpecification;
 }
 
-function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify, onMapExtentChange }: MapViewProps) {
+function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify, onMapExtentChange, onStatisticsChange }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const leftMapRef = useRef<maplibregl.Map | null>(null);
   const rightMapRef = useRef<maplibregl.Map | null>(null);
@@ -171,6 +218,10 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
   const onMapExtentChangeRef = useRef(onMapExtentChange);
   onMapExtentChangeRef.current = onMapExtentChange;
 
+  // Store statistics change callback in ref
+  const onStatisticsChangeRef = useRef(onStatisticsChange);
+  onStatisticsChangeRef.current = onStatisticsChange;
+
   // Debounce timer for choropleth fetching
   const fetchTimerRef = useRef<number | null>(null);
 
@@ -188,6 +239,9 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     if (!c.attribute) {
       removeChoroplethLayers(leftMap, 'left');
       removeChoroplethLayers(rightMap, 'right');
+      if (onStatisticsChangeRef.current) {
+        onStatisticsChangeRef.current({ domainRange: null, leftStats: null, rightStats: null });
+      }
       return;
     }
 
@@ -196,6 +250,9 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     if (currentZoom < MIN_CATCHMENT_ZOOM) {
       removeChoroplethLayers(leftMap, 'left');
       removeChoroplethLayers(rightMap, 'right');
+      if (onStatisticsChangeRef.current) {
+        onStatisticsChangeRef.current({ domainRange: null, leftStats: null, rightStats: null });
+      }
       return;
     }
 
@@ -219,6 +276,18 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
       } else if (rightData && rightData.domain_min !== undefined && rightData.domain_max !== undefined) {
         min = rightData.domain_min;
         max = rightData.domain_max;
+      }
+
+      // Compute zone statistics for each scenario and notify via callback
+      const leftStatsComputed = leftData ? computeZoneStats(leftData, c.attribute) : null;
+      const rightStatsComputed = rightData ? computeZoneStats(rightData, c.attribute) : null;
+
+      if (onStatisticsChangeRef.current) {
+        onStatisticsChangeRef.current({
+          domainRange: { min, max },
+          leftStats: leftStatsComputed,
+          rightStats: rightStatsComputed,
+        });
       }
 
       // Apply to left map - verify the map is ready
@@ -932,6 +1001,7 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
           </Tooltip>
         </VStack>
       )}
+
     </Box>
   );
 }

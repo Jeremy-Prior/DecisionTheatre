@@ -21,8 +21,8 @@ import {
 } from '@chakra-ui/react';
 import { FiChevronRight, FiInfo, FiX, FiFolderPlus } from 'react-icons/fi';
 import { useColumns } from '../hooks/useApi';
-import { PRISM_CSS_GRADIENT } from './MapView';
-import type { Scenario, ComparisonState, IdentifyResult } from '../types';
+import { PRISM_CSS_GRADIENT, formatNumber } from './MapView';
+import type { Scenario, ComparisonState, IdentifyResult, MapStatistics } from '../types';
 import { SCENARIOS } from '../types';
 
 interface ControlPanelProps {
@@ -36,18 +36,23 @@ interface ControlPanelProps {
   onClearIdentify?: () => void;
   isExploreMode?: boolean;
   onNavigateToCreate?: () => void;
+  mapStatistics?: MapStatistics;
 }
+
+import type { ZoneStats } from '../types';
 
 function ScenarioSelector({
   label,
   value,
   onChange,
   side,
+  zoneStats,
 }: {
   label: string;
   value: Scenario;
   onChange: (s: Scenario) => void;
   side: 'left' | 'right';
+  zoneStats?: ZoneStats | null;
 }) {
   const selectedInfo = SCENARIOS.find((s) => s.id === value);
   const borderColor = useColorModeValue('gray.200', 'gray.600');
@@ -97,6 +102,35 @@ function ScenarioSelector({
           {selectedInfo.description}
         </Text>
       )}
+
+      {/* Zone statistics for visible catchments */}
+      {zoneStats && (
+        <Box mt={3} pt={3} borderTop="1px" borderColor={borderColor}>
+          <Text fontSize="xs" color="gray.500" mb={2}>
+            Visible Zone Statistics ({zoneStats.count} catchments)
+          </Text>
+          <HStack justify="space-between">
+            <VStack spacing={0} align="start">
+              <Text fontSize="10px" color="gray.500">Min</Text>
+              <Text fontSize="sm" fontWeight="600" color={selectedInfo?.color || 'white'}>
+                {formatNumber(zoneStats.min)}
+              </Text>
+            </VStack>
+            <VStack spacing={0} align="center">
+              <Text fontSize="10px" color="gray.500">Mean</Text>
+              <Text fontSize="sm" fontWeight="600" color={selectedInfo?.color || 'white'}>
+                {formatNumber(zoneStats.mean)}
+              </Text>
+            </VStack>
+            <VStack spacing={0} align="end">
+              <Text fontSize="10px" color="gray.500">Max</Text>
+              <Text fontSize="sm" fontWeight="600" color={selectedInfo?.color || 'white'}>
+                {formatNumber(zoneStats.max)}
+              </Text>
+            </VStack>
+          </HStack>
+        </Box>
+      )}
     </Box>
   );
 }
@@ -112,6 +146,7 @@ function ControlPanel({
   onClearIdentify,
   isExploreMode,
   onNavigateToCreate,
+  mapStatistics,
 }: ControlPanelProps) {
   const { columns, loading: columnsLoading } = useColumns();
   const bgColor = useColorModeValue('gray.50', 'gray.800');
@@ -178,6 +213,7 @@ function ControlPanel({
             value={comparison.leftScenario}
             onChange={onLeftChange}
             side="left"
+            zoneStats={mapStatistics?.leftStats}
           />
 
           {/* Scenario 2 (Right) */}
@@ -186,6 +222,7 @@ function ControlPanel({
             value={comparison.rightScenario}
             onChange={onRightChange}
             side="right"
+            zoneStats={mapStatistics?.rightStats}
           />
 
           <Divider />
@@ -245,7 +282,7 @@ function ControlPanel({
           {comparison.attribute && (
             <Box>
               <Text fontSize="xs" fontWeight="600" color="gray.500" mb={2}>
-                COLOR SCALE
+                COLOR SCALE (Domain Range)
               </Text>
               <Box
                 h="12px"
@@ -254,10 +291,14 @@ function ControlPanel({
               />
               <HStack justify="space-between" mt={1}>
                 <Text fontSize="xs" color="gray.500">
-                  Low
+                  {mapStatistics?.domainRange
+                    ? formatNumber(mapStatistics.domainRange.min)
+                    : 'Low'}
                 </Text>
                 <Text fontSize="xs" color="gray.500">
-                  High
+                  {mapStatistics?.domainRange
+                    ? formatNumber(mapStatistics.domainRange.max)
+                    : 'High'}
                 </Text>
               </HStack>
             </Box>

@@ -61,53 +61,91 @@ All are available in the Nix dev shell (`nix develop`).
 
 The MapBox GL Style JSON at `resources/mbtiles/style.json` defines how each layer is rendered (colours, line widths, label placement). Edit this file to change the map's visual appearance.
 
-## Scenario Data (CSV to Parquet)
+## Scenario Data (GeoPackage Datapack)
 
-Raw scenario data is delivered as CSV files:
+The application uses a GeoPackage file (`datapack.gpkg`) containing catchment geometries and scenario data. This is built from raw input files using the `scripts/build_datapack.sh` script.
+
+### Input Files
+
+Place the following files in the `data/` directory:
 
 | File | Description |
 |------|-------------|
-| `data/current.csv` | Current scenario — per-catchment metrics |
-| `data/reference.csv` | Reference scenario — per-catchment metrics  |
-| `data/metadata.csv` | Describes each column in the current and reference data|
+| `catchments.gpkg` | GeoPackage containing catchment geometries in the `catchments_lev12` layer |
+| `current.csv` | Current scenario — per-catchment metrics |
+| `reference.csv` | Reference scenario — per-catchment metrics |
+| `metadata.csv` | (Optional) Describes each column in the scenario data |
 
-All CSVs share a `catchID` column that cross-references catchment polygons in the MBTiles map.
+All CSVs must have a `catchID` column that cross-references the `HYBAS_ID` in the catchment geometries.
 
-### Converting CSV to Parquet
+### Building the Datapack
 
-Convert CSVs to Parquet for efficient storage and fast columnar reads:
+```bash
+bash scripts/build_datapack.sh ./data
+```
+
+This script performs the following steps:
+
+1. **Base setup** — Copies `catchments.gpkg` as the base for the output file
+2. **CSV import** — Imports scenario CSVs as raw tables using `ogr2ogr`
+3. **Type conversion** — Converts data columns to REAL type, converting `NA` strings to NULL
+4. **Column normalization** — Normalizes column names across tables (replaces dashes, spaces with dots)
+5. **Indexing** — Creates integer indexes on catchment IDs for fast joins
+6. **GeoJSON precomputation** — Converts geometries to GeoJSON for fast API serving
+7. **Domain min/max** — Computes global min/max for each attribute across both scenarios
+
+### Output GeoPackage Schema
+
+The output `datapack.gpkg` contains these tables:
+
+| Table | Description |
+|-------|-------------|
+| `catchments_lev12` | Catchment polygons with `HYBAS_ID`, `geom`, and precomputed `geojson` |
+| `scenario_current` | Current scenario data with normalized column names |
+| `scenario_reference` | Reference scenario data with normalized column names |
+| `domain_minima` | Global minimum values for each attribute across both scenarios |
+| `domain_maxima` | Global maximum values for each attribute across both scenarios |
+| `metadata` | (If provided) Column descriptions from the metadata CSV |
+
+#### Scenario Tables Schema
+
+Both `scenario_current` and `scenario_reference` tables have:
+
+- `catchment_id` (TEXT) — The catchment identifier (normalized from `catchID`)
+- `catchment_id_int` (INTEGER) — Integer version for indexed joins
+- All attribute columns as REAL type (NULL for missing/NA values)
+
+#### Domain Tables Schema
+
+The `domain_minima` and `domain_maxima` tables each contain one row with:
+
+- All attribute columns from the scenario tables
+- Each column contains the global min (or max) value computed across both scenarios
+- These are used for consistent color scaling across scenario comparisons
+
+### Column Normalization
+
+The build script normalizes column names to ensure consistency between tables:
+
+- `catchID` → `catchment_id`
+- Dashes (`-`), spaces, apostrophes → dots (`.`)
+- Multiple consecutive dots → single dot
+- Duplicate ID columns (e.g., `sp_current.catchID`) are dropped
+
+### Required Tools
+
+- `ogr2ogr` (GDAL)
+- `sqlite3`
+- `python3`
+
+All are available in the Nix dev shell (`nix develop`).
+
+## Legacy: CSV to Parquet
+
+For historical reference, there was a previous approach using Parquet files:
 
 ```bash
 make csv2parquet
 ```
 
-This runs `scripts/csv2parquet.py` which uses PyArrow to produce snappy-compressed Parquet files alongside the source CSVs in `data/`. The CSV files are gitignored; only the conversion tooling is tracked.
-
-### Building a Data Pack
-
-To bundle the Parquet files and MBTiles into a distributable zip:
-
-```bash
-make datapack
-```
-
-This automatically converts any CSVs to Parquet first, then assembles:
-
-```
-decision-theatre-data-v{VERSION}/
-  data/
-    current.parquet
-    reference.parquet
-    metadata.parquet
-  resources/
-    mbtiles/
-      catchments.mbtiles
-      style.json
-  manifest.json
-```
-
-The resulting zip can be extracted on another host and used with `--data-dir` and `--resources-dir`.
-
-### GeoParquet (future)
-
-Place GeoParquet files in the `data/` directory for spatial scenario data with embedded geometry. The server reads these at startup and exposes attribute names via the API.
+This converted CSVs to Parquet using PyArrow. The current GeoPackage-based approach is preferred as it consolidates all data into a single file with proper spatial indexing.
