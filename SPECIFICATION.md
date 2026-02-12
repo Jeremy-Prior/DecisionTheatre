@@ -65,8 +65,17 @@ Sites are geographical areas that save the user's boundary and exploration state
 
 **When Opening a Site:**
 - Map zooms to site bounds with 10% padding
-- Site title displayed in header breadcrumb
+- Site title displayed in header breadcrumb with edit button
 - Site boundary displayed with glowing neon effect overlay
+
+**Site Boundary Editing:**
+- Pencil icon next to site title enables boundary edit mode
+- When active:
+  - All polygon vertices displayed as glowing cyan circles
+  - Vertices are draggable to reshape the boundary
+  - Real-time boundary updates as vertices are moved
+  - Edit mode banner shown at top of map
+  - Tools panel for adding/removing catchments from boundary
 
 ### 3. Site Creation
 
@@ -146,7 +155,12 @@ interface Site {
 - Attribute/factor selector
 - Color scale legend
 - Zone statistics
-- Identify results table
+- Identify results table with horizontal bar visualization
+  - Each row shows values for both scenarios
+  - Left column has bars growing from left edge
+  - Right column has bars growing from right edge
+  - Bar lengths are proportional (larger value = 100%, smaller value = percentage)
+  - Bars use scenario colors at low opacity
 - Create Site button (in explore mode)
 
 ---

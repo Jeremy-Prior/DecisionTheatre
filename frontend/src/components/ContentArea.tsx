@@ -10,11 +10,15 @@ interface ContentAreaProps {
   onFocusPane: (index: number) => void;
   onGoQuad: () => void;
   onIdentify?: (result: IdentifyResult) => void;
+  identifyResult?: IdentifyResult;
   onMapExtentChange?: (extent: MapExtent) => void;
   onStatisticsChange?: (stats: MapStatistics) => void;
   isPanelOpen?: boolean;
   siteId?: string | null;
   siteBounds?: BoundingBox | null;
+  isBoundaryEditMode?: boolean;
+  siteGeometry?: GeoJSON.Geometry | null;
+  onBoundaryUpdate?: (geometry: GeoJSON.Geometry) => void;
 }
 
 const paneVariants = {
@@ -46,11 +50,15 @@ function ContentArea({
   onFocusPane,
   onGoQuad,
   onIdentify,
+  identifyResult,
   onMapExtentChange,
   onStatisticsChange,
   isPanelOpen,
   siteId,
   siteBounds,
+  isBoundaryEditMode,
+  siteGeometry,
+  onBoundaryUpdate,
 }: ContentAreaProps) {
   const isQuad = mode === 'quad';
 
@@ -84,6 +92,7 @@ function ContentArea({
               onFocusPane={onFocusPane}
               onGoQuad={onGoQuad}
               onIdentify={onIdentify}
+              identifyResult={identifyResult}
               siteId={siteId}
               siteBounds={siteBounds}
             />
@@ -107,6 +116,7 @@ function ContentArea({
                   onFocusPane={onFocusPane}
                   onGoQuad={onGoQuad}
                   onIdentify={onIdentify}
+                  identifyResult={identifyResult}
                   siteId={siteId}
                   siteBounds={siteBounds}
                 />
@@ -129,11 +139,15 @@ function ContentArea({
             onFocusPane={onFocusPane}
             onGoQuad={onGoQuad}
             onIdentify={onIdentify}
+            identifyResult={identifyResult}
             onMapExtentChange={onMapExtentChange}
             onStatisticsChange={onStatisticsChange}
             isPanelOpen={isPanelOpen}
             siteId={siteId}
             siteBounds={siteBounds}
+            isBoundaryEditMode={isBoundaryEditMode}
+            siteGeometry={siteGeometry}
+            onBoundaryUpdate={onBoundaryUpdate}
           />
         </Box>
       )}

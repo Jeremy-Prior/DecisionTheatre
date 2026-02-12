@@ -9,7 +9,7 @@ import {
   useColorModeValue,
   Tooltip,
 } from '@chakra-ui/react';
-import { FiLayers, FiHelpCircle, FiHome, FiMapPin, FiMap } from 'react-icons/fi';
+import { FiLayers, FiHelpCircle, FiHome, FiMapPin, FiMap, FiEdit2 } from 'react-icons/fi';
 import { useServerInfo } from '../hooks/useApi';
 import type { AppPage } from '../types';
 
@@ -19,9 +19,11 @@ interface HeaderProps {
   onNavigate?: (page: AppPage) => void;
   currentPage?: AppPage;
   siteTitle?: string | null;
+  onEditBoundary?: () => void;
+  isBoundaryEditMode?: boolean;
 }
 
-function Header({ onToggleDocs, isDocsOpen, onNavigate, currentPage, siteTitle }: HeaderProps) {
+function Header({ onToggleDocs, isDocsOpen, onNavigate, currentPage, siteTitle, onEditBoundary, isBoundaryEditMode }: HeaderProps) {
   const { info } = useServerInfo();
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
@@ -79,6 +81,22 @@ function Header({ onToggleDocs, isDocsOpen, onNavigate, currentPage, siteTitle }
             >
               {siteTitle}
             </Text>
+            {onEditBoundary && (
+              <Tooltip label={isBoundaryEditMode ? "Exit edit mode" : "Edit site boundary"}>
+                <IconButton
+                  aria-label="Edit site boundary"
+                  icon={<FiEdit2 />}
+                  size="xs"
+                  ml={2}
+                  variant={isBoundaryEditMode ? "solid" : "ghost"}
+                  colorScheme={isBoundaryEditMode ? "cyan" : "gray"}
+                  onClick={onEditBoundary}
+                  _hover={{
+                    bg: isBoundaryEditMode ? "cyan.600" : "gray.100",
+                  }}
+                />
+              </Tooltip>
+            )}
           </>
         )}
       </HStack>

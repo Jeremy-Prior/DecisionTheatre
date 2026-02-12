@@ -196,13 +196,19 @@ func (h *Handler) handleComparisonData(w http.ResponseWriter, r *http.Request) {
 
 // handleCatchmentIdentify returns all attributes for a catchment across scenarios
 func (h *Handler) handleCatchmentIdentify(w http.ResponseWriter, r *http.Request) {
-	if h.geoStore == nil {
-		respondError(w, http.StatusNotFound, "no geo data loaded")
-		return
+	catchmentID := mux.Vars(r)["id"]
+	var data map[string]map[string]float64
+
+	// Try gpkgStore first (GeoPackage), then fall back to geoStore (Parquet)
+	if h.gpkgStore != nil {
+		data = h.gpkgStore.GetCatchmentAttributes(catchmentID)
 	}
 
-	catchmentID := mux.Vars(r)["id"]
-	data := h.geoStore.GetCatchmentAttributes(catchmentID)
+	// Fallback to geoStore if gpkgStore returned nothing
+	if len(data) == 0 && h.geoStore != nil {
+		data = h.geoStore.GetCatchmentAttributes(catchmentID)
+	}
+
 	if len(data) == 0 {
 		respondError(w, http.StatusNotFound, "catchment not found")
 		return

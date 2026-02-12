@@ -14,11 +14,15 @@ interface ViewPaneProps {
   onFocusPane: (index: number) => void;
   onGoQuad: () => void;
   onIdentify?: (result: IdentifyResult) => void;
+  identifyResult?: IdentifyResult;
   onMapExtentChange?: (extent: MapExtent) => void;
   onStatisticsChange?: (stats: MapStatistics) => void;
   isPanelOpen?: boolean;
   siteId?: string | null;
   siteBounds?: BoundingBox | null;
+  isBoundaryEditMode?: boolean;
+  siteGeometry?: GeoJSON.Geometry | null;
+  onBoundaryUpdate?: (geometry: GeoJSON.Geometry) => void;
 }
 
 function ViewPane({
@@ -29,11 +33,15 @@ function ViewPane({
   onFocusPane,
   onGoQuad,
   onIdentify,
+  identifyResult,
   onMapExtentChange,
   onStatisticsChange,
   isPanelOpen,
   siteId,
   siteBounds,
+  isBoundaryEditMode,
+  siteGeometry,
+  onBoundaryUpdate,
 }: ViewPaneProps) {
   const [isChartView, setIsChartView] = useState(false);
   const borderColor = useColorModeValue('gray.600', 'gray.600');
@@ -74,11 +82,15 @@ function ViewPane({
           paneIndex={paneIndex}
           onOpenSettings={() => onFocusPane(paneIndex)}
           onIdentify={onIdentify}
+          identifyResult={identifyResult}
           onMapExtentChange={onMapExtentChange}
           onStatisticsChange={onStatisticsChange}
           isPanelOpen={isPanelOpen}
           siteId={siteId}
           siteBounds={siteBounds}
+          isBoundaryEditMode={isBoundaryEditMode}
+          siteGeometry={siteGeometry}
+          onBoundaryUpdate={onBoundaryUpdate}
         />
       </Box>
 

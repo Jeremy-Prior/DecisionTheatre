@@ -364,14 +364,31 @@ function ControlPanel({
                   overflowY="auto"
                 >
                   <Table size="sm" variant="striped">
-                    <Thead position="sticky" top={0} bg={tableHeaderBg} zIndex={1}>
+                    <Thead
+                      position="sticky"
+                      top={0}
+                      zIndex={2}
+                      boxShadow="0 2px 4px rgba(0,0,0,0.1)"
+                    >
                       <Tr>
-                        <Th fontSize="xs" py={2}>Attribute</Th>
-                        {Object.keys(identifyResult.data).map((scenario) => (
-                          <Th key={scenario} fontSize="xs" py={2} isNumeric>
-                            {SCENARIOS.find((s) => s.id === scenario)?.label || scenario}
-                          </Th>
-                        ))}
+                        <Th fontSize="xs" py={2} bg={tableHeaderBg}>Attribute</Th>
+                        {/* Order columns to match left/right map panes */}
+                        {[comparison.leftScenario, comparison.rightScenario].map((scenarioId, idx) => {
+                          const scenarioInfo = SCENARIOS.find((s) => s.id === scenarioId);
+                          return (
+                            <Th
+                              key={scenarioId}
+                              fontSize="xs"
+                              py={2}
+                              isNumeric
+                              borderLeft={`3px solid ${scenarioInfo?.color || '#fff'}`}
+                              color={scenarioInfo?.color}
+                              bg={tableHeaderBg}
+                            >
+                              {idx === 0 ? 'Left: ' : 'Right: '}{scenarioInfo?.label || scenarioId}
+                            </Th>
+                          );
+                        })}
                       </Tr>
                     </Thead>
                     <Tbody>
@@ -383,31 +400,98 @@ function ControlPanel({
                             allAttrs.add(attr);
                           }
                         }
-                        const scenarios = Object.keys(identifyResult.data);
-                        return Array.from(allAttrs).sort().map((attr) => (
-                          <Tr key={attr}>
-                            <Td
-                              fontSize="xs"
-                              fontWeight={attr === comparison.attribute ? '700' : '400'}
-                              color={attr === comparison.attribute ? 'blue.400' : undefined}
-                              py={1.5}
-                              maxW="160px"
-                              overflow="hidden"
-                              textOverflow="ellipsis"
-                              whiteSpace="nowrap"
-                              title={attr}
-                            >
-                              {attr}
-                            </Td>
-                            {scenarios.map((scenario) => (
-                              <Td key={scenario} fontSize="xs" isNumeric py={1.5}>
-                                {identifyResult.data[scenario][attr] != null
-                                  ? identifyResult.data[scenario][attr].toFixed(2)
-                                  : '-'}
+                        // Use ordered scenarios matching left/right panes
+                        const orderedScenarios = [comparison.leftScenario, comparison.rightScenario];
+                        return Array.from(allAttrs).sort().map((attr) => {
+                          // Get values for both scenarios
+                          const leftVal = identifyResult.data[orderedScenarios[0]]?.[attr];
+                          const rightVal = identifyResult.data[orderedScenarios[1]]?.[attr];
+
+                          // Calculate bar widths (percentage of cell)
+                          const maxVal = Math.max(
+                            typeof leftVal === 'number' ? Math.abs(leftVal) : 0,
+                            typeof rightVal === 'number' ? Math.abs(rightVal) : 0
+                          );
+
+                          const leftBarWidth = maxVal > 0 && typeof leftVal === 'number'
+                            ? (Math.abs(leftVal) / maxVal) * 100
+                            : 0;
+                          const rightBarWidth = maxVal > 0 && typeof rightVal === 'number'
+                            ? (Math.abs(rightVal) / maxVal) * 100
+                            : 0;
+
+                          // Get scenario colors
+                          const leftScenarioInfo = SCENARIOS.find((s) => s.id === orderedScenarios[0]);
+                          const rightScenarioInfo = SCENARIOS.find((s) => s.id === orderedScenarios[1]);
+
+                          return (
+                            <Tr key={attr}>
+                              <Td
+                                fontSize="xs"
+                                fontWeight={attr === comparison.attribute ? '700' : '400'}
+                                color={attr === comparison.attribute ? 'blue.400' : undefined}
+                                py={1.5}
+                                maxW="160px"
+                                overflow="hidden"
+                                textOverflow="ellipsis"
+                                whiteSpace="nowrap"
+                                title={attr}
+                              >
+                                {attr}
                               </Td>
-                            ))}
-                          </Tr>
-                        ));
+                              {/* Left scenario cell - bar from left */}
+                              <Td
+                                fontSize="xs"
+                                isNumeric
+                                py={1.5}
+                                position="relative"
+                                overflow="hidden"
+                              >
+                                {/* Bar background - originates from left */}
+                                <Box
+                                  position="absolute"
+                                  top="2px"
+                                  bottom="2px"
+                                  left={0}
+                                  width={`${leftBarWidth}%`}
+                                  bg={leftScenarioInfo?.color || 'orange.400'}
+                                  opacity={0.25}
+                                  borderRightRadius="sm"
+                                  transition="width 0.3s ease"
+                                />
+                                {/* Value text */}
+                                <Text position="relative" zIndex={1}>
+                                  {leftVal != null ? leftVal.toFixed(2) : '-'}
+                                </Text>
+                              </Td>
+                              {/* Right scenario cell - bar from right */}
+                              <Td
+                                fontSize="xs"
+                                isNumeric
+                                py={1.5}
+                                position="relative"
+                                overflow="hidden"
+                              >
+                                {/* Bar background - originates from right */}
+                                <Box
+                                  position="absolute"
+                                  top="2px"
+                                  bottom="2px"
+                                  right={0}
+                                  width={`${rightBarWidth}%`}
+                                  bg={rightScenarioInfo?.color || 'blue.400'}
+                                  opacity={0.25}
+                                  borderLeftRadius="sm"
+                                  transition="width 0.3s ease"
+                                />
+                                {/* Value text */}
+                                <Text position="relative" zIndex={1}>
+                                  {rightVal != null ? rightVal.toFixed(2) : '-'}
+                                </Text>
+                              </Td>
+                            </Tr>
+                          );
+                        });
                       })()}
                     </Tbody>
                   </Table>

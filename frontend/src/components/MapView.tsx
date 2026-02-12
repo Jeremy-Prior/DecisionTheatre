@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Box, IconButton, Tooltip, Icon, VStack, Button, Flex, Text } from '@chakra-ui/react';
-import { FiSliders, FiMap, FiInfo, FiBox } from 'react-icons/fi';
+import { FiSliders, FiMap, FiInfo, FiBox, FiTarget, FiPlus, FiMinus } from 'react-icons/fi';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { ComparisonState, Scenario, IdentifyResult, MapExtent, MapStatistics, ZoneStats, BoundingBox } from '../types';
@@ -12,11 +12,15 @@ interface MapViewProps {
   paneIndex: number;
   onOpenSettings: () => void;
   onIdentify?: (result: IdentifyResult) => void;
+  identifyResult?: IdentifyResult;
   onMapExtentChange?: (extent: MapExtent) => void;
   onStatisticsChange?: (stats: MapStatistics) => void;
   isPanelOpen?: boolean;
   siteId?: string | null;
   siteBounds?: BoundingBox | null;
+  isBoundaryEditMode?: boolean;
+  siteGeometry?: GeoJSON.Geometry | null;
+  onBoundaryUpdate?: (geometry: GeoJSON.Geometry) => void;
 }
 
 // Layer IDs for choropleth
@@ -24,6 +28,10 @@ const CHOROPLETH_LAYER_LEFT = 'choropleth-left';
 const CHOROPLETH_LAYER_RIGHT = 'choropleth-right';
 const CHOROPLETH_3D_LEFT = 'choropleth-left-3d';
 const CHOROPLETH_3D_RIGHT = 'choropleth-right-3d';
+
+// Layer IDs for identify highlight (neon glow effect)
+const IDENTIFY_HIGHLIGHT_GLOW = 'identify-highlight-glow';
+const IDENTIFY_HIGHLIGHT_LINE = 'identify-highlight-line';
 
 // Prism colour gradient for data visualization
 // Spectrum: violet -> indigo -> blue -> cyan -> green -> yellow -> orange -> red
@@ -196,7 +204,13 @@ const SITE_BOUNDARY_GLOW_OUTER = 'site-boundary-glow-outer';
 const SITE_BOUNDARY_GLOW_MIDDLE = 'site-boundary-glow-middle';
 const SITE_BOUNDARY_LINE = 'site-boundary-line';
 
-function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify, onMapExtentChange, onStatisticsChange, isPanelOpen, siteId, siteBounds }: MapViewProps) {
+// Layer IDs for boundary editing vertices
+const EDIT_VERTICES_SOURCE = 'edit-vertices-source';
+const EDIT_VERTICES_GLOW = 'edit-vertices-glow';
+const EDIT_VERTICES_OUTER = 'edit-vertices-outer';
+const EDIT_VERTICES_INNER = 'edit-vertices-inner';
+
+function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify, identifyResult, onMapExtentChange, onStatisticsChange, isPanelOpen, siteId, siteBounds, isBoundaryEditMode, siteGeometry, onBoundaryUpdate }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const leftMapRef = useRef<maplibregl.Map | null>(null);
   const rightMapRef = useRef<maplibregl.Map | null>(null);
@@ -395,10 +409,62 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
         });
       }
 
+      // Move site boundary layers to top if they exist
+      moveSiteBoundaryToTop(map);
+
       // Force a re-render to ensure the layer is drawn
       map.triggerRepaint();
     } catch (err) {
       console.error(`Error adding choropleth layer for ${side}:`, err);
+    }
+  }
+
+  /**
+   * Move site boundary layers to top of layer stack
+   */
+  function moveSiteBoundaryToTop(map: maplibregl.Map) {
+    // Re-add site boundary layers on top by removing and re-adding them
+    if (map.getSource(SITE_BOUNDARY_SOURCE)) {
+      // Remove existing layers (not source)
+      if (map.getLayer(SITE_BOUNDARY_LINE)) map.removeLayer(SITE_BOUNDARY_LINE);
+      if (map.getLayer(SITE_BOUNDARY_GLOW_MIDDLE)) map.removeLayer(SITE_BOUNDARY_GLOW_MIDDLE);
+      if (map.getLayer(SITE_BOUNDARY_GLOW_OUTER)) map.removeLayer(SITE_BOUNDARY_GLOW_OUTER);
+
+      // Re-add layers (they'll be on top now)
+      map.addLayer({
+        id: SITE_BOUNDARY_GLOW_OUTER,
+        type: 'line',
+        source: SITE_BOUNDARY_SOURCE,
+        paint: {
+          'line-color': '#FF00FF',
+          'line-width': 20,
+          'line-opacity': 0.5,
+          'line-blur': 12,
+        },
+      });
+
+      map.addLayer({
+        id: SITE_BOUNDARY_GLOW_MIDDLE,
+        type: 'line',
+        source: SITE_BOUNDARY_SOURCE,
+        paint: {
+          'line-color': '#FF44FF',
+          'line-width': 10,
+          'line-opacity': 0.7,
+          'line-blur': 6,
+        },
+      });
+
+      map.addLayer({
+        id: SITE_BOUNDARY_LINE,
+        type: 'line',
+        source: SITE_BOUNDARY_SOURCE,
+        paint: {
+          'line-color': '#FFAAFF',
+          'line-width': 5,
+          'line-opacity': 1,
+        },
+      });
     }
   }
 
@@ -418,6 +484,27 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
   const toggleIdentifyMode = useCallback(() => {
     setIsIdentifyMode(prev => !prev);
   }, []);
+
+  // Zoom to site bounds with 10% padding
+  const zoomToSite = useCallback(() => {
+    const leftMap = leftMapRef.current;
+    if (!leftMap || !siteBounds) return;
+
+    // Add 10% padding to bounds
+    const dx = (siteBounds.maxX - siteBounds.minX) * 0.1;
+    const dy = (siteBounds.maxY - siteBounds.minY) * 0.1;
+
+    const paddedBounds: [[number, number], [number, number]] = [
+      [siteBounds.minX - dx, siteBounds.minY - dy],
+      [siteBounds.maxX + dx, siteBounds.maxY + dy],
+    ];
+
+    leftMap.fitBounds(paddedBounds, {
+      padding: 50,
+      duration: 1000,
+      maxZoom: 14,
+    });
+  }, [siteBounds]);
 
   // Toggle 3D mode - smoothly ease pitch between 0 and 60 degrees
   // and rebuild layers with/without extrusion
@@ -843,6 +930,77 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     applyColors();
   }, [comparison, applyColors]);
 
+  // Highlight identified catchment with neon yellow glow effect
+  useEffect(() => {
+    const leftMap = leftMapRef.current;
+    const rightMap = rightMapRef.current;
+
+    if (!leftMap || !rightMap) return;
+    if (!mapsReady.current.left || !mapsReady.current.right) return;
+
+    // Helper to remove highlight layers from a map
+    const removeHighlight = (map: maplibregl.Map) => {
+      if (map.getLayer(IDENTIFY_HIGHLIGHT_LINE)) map.removeLayer(IDENTIFY_HIGHLIGHT_LINE);
+      if (map.getLayer(IDENTIFY_HIGHLIGHT_GLOW)) map.removeLayer(IDENTIFY_HIGHLIGHT_GLOW);
+    };
+
+    // Helper to add neon yellow glow highlight to a catchment
+    const addHighlight = (map: maplibregl.Map, catchmentId: string) => {
+      removeHighlight(map);
+
+      // Use the vector tile source "UoW Tiles" and filter by HYBAS_ID
+      const sourceId = 'UoW Tiles';
+
+      // Check if the source exists
+      if (!map.getSource(sourceId)) {
+        console.warn('Identify highlight: source not found:', sourceId);
+        return;
+      }
+
+      // Parse catchmentId as number for filtering (HYBAS_ID is numeric)
+      const catchmentIdNum = parseInt(catchmentId, 10);
+
+      // Add outer glow layer (neon yellow)
+      map.addLayer({
+        id: IDENTIFY_HIGHLIGHT_GLOW,
+        type: 'line',
+        source: sourceId,
+        'source-layer': 'catchments_lev12',
+        filter: ['==', ['get', CATCHMENT_ID_PROP], catchmentIdNum],
+        paint: {
+          'line-color': '#FFFF00',  // Bright yellow
+          'line-width': 12,
+          'line-blur': 8,
+          'line-opacity': 0.7,
+        },
+      });
+
+      // Add inner bright line (white/yellow)
+      map.addLayer({
+        id: IDENTIFY_HIGHLIGHT_LINE,
+        type: 'line',
+        source: sourceId,
+        'source-layer': 'catchments_lev12',
+        filter: ['==', ['get', CATCHMENT_ID_PROP], catchmentIdNum],
+        paint: {
+          'line-color': '#FFFFAA',  // Pale yellow
+          'line-width': 4,
+          'line-opacity': 1,
+        },
+      });
+    };
+
+    // Remove existing highlights
+    removeHighlight(leftMap);
+    removeHighlight(rightMap);
+
+    // Add highlight if there's an identify result
+    if (identifyResult?.catchmentID) {
+      addHighlight(leftMap, identifyResult.catchmentID);
+      addHighlight(rightMap, identifyResult.catchmentID);
+    }
+  }, [identifyResult]);
+
   // Fetch and display site boundary when siteId changes
   useEffect(() => {
     const leftMap = leftMapRef.current;
@@ -873,40 +1031,40 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
         },
       });
 
-      // Outer glow layer (wide, transparent cyan)
+      // Outer glow layer (wide, transparent neon pink) - always at top
       map.addLayer({
         id: SITE_BOUNDARY_GLOW_OUTER,
         type: 'line',
         source: SITE_BOUNDARY_SOURCE,
         paint: {
-          'line-color': '#00FFFF',
-          'line-width': 12,
-          'line-opacity': 0.3,
-          'line-blur': 8,
+          'line-color': '#FF00FF',  // Magenta/pink
+          'line-width': 20,
+          'line-opacity': 0.5,
+          'line-blur': 12,
         },
       });
 
-      // Middle glow layer (medium, semi-transparent)
+      // Middle glow layer (medium, semi-transparent pink)
       map.addLayer({
         id: SITE_BOUNDARY_GLOW_MIDDLE,
         type: 'line',
         source: SITE_BOUNDARY_SOURCE,
         paint: {
-          'line-color': '#00FFFF',
-          'line-width': 6,
-          'line-opacity': 0.6,
-          'line-blur': 3,
+          'line-color': '#FF44FF',  // Lighter pink
+          'line-width': 10,
+          'line-opacity': 0.7,
+          'line-blur': 6,
         },
       });
 
-      // Core line (bright solid line)
+      // Core line (bright solid hot pink)
       map.addLayer({
         id: SITE_BOUNDARY_LINE,
         type: 'line',
         source: SITE_BOUNDARY_SOURCE,
         paint: {
-          'line-color': '#00FF88',
-          'line-width': 3,
+          'line-color': '#FFAAFF',  // Brighter light pink
+          'line-width': 5,
           'line-opacity': 1,
         },
       });
@@ -989,6 +1147,252 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
       return () => clearTimeout(timer);
     }
   }, [siteBounds]);
+
+  // Store edit mode refs for event handlers
+  const isBoundaryEditModeRef = useRef(isBoundaryEditMode);
+  isBoundaryEditModeRef.current = isBoundaryEditMode;
+  const siteGeometryRef = useRef(siteGeometry);
+  siteGeometryRef.current = siteGeometry;
+  const onBoundaryUpdateRef = useRef(onBoundaryUpdate);
+  onBoundaryUpdateRef.current = onBoundaryUpdate;
+  const editVerticesRef = useRef<[number, number][]>([]);
+  const draggingVertexIndexRef = useRef<number | null>(null);
+
+  // Extract vertices from geometry
+  const extractVertices = useCallback((geometry: GeoJSON.Geometry | null | undefined): [number, number][] => {
+    if (!geometry) return [];
+
+    if (geometry.type === 'Polygon') {
+      // Return all vertices except the closing one (which duplicates the first)
+      const ring = geometry.coordinates[0];
+      return ring.slice(0, -1) as [number, number][];
+    } else if (geometry.type === 'MultiPolygon') {
+      // Flatten all rings from all polygons
+      const vertices: [number, number][] = [];
+      for (const polygon of geometry.coordinates) {
+        const ring = polygon[0];
+        vertices.push(...(ring.slice(0, -1) as [number, number][]));
+      }
+      return vertices;
+    }
+    return [];
+  }, []);
+
+  // Build geometry from vertices
+  const buildGeometryFromVertices = useCallback((vertices: [number, number][], originalGeometry: GeoJSON.Geometry): GeoJSON.Geometry => {
+    if (originalGeometry.type === 'Polygon') {
+      // Close the polygon by adding the first vertex at the end
+      const closedRing = [...vertices, vertices[0]];
+      return {
+        type: 'Polygon',
+        coordinates: [closedRing],
+      };
+    }
+    // For MultiPolygon, we'd need more complex logic - for now just handle Polygon
+    return originalGeometry;
+  }, []);
+
+  // Update edit vertices layer on both maps
+  const updateEditVerticesLayer = useCallback((vertices: [number, number][]) => {
+    const leftMap = leftMapRef.current;
+    const rightMap = rightMapRef.current;
+    if (!leftMap || !rightMap) return;
+
+    const updateMapVertices = (map: maplibregl.Map) => {
+      // Create feature collection for vertices
+      const features: GeoJSON.Feature[] = vertices.map((coord, idx) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: coord },
+        properties: { index: idx },
+      }));
+
+      const source = map.getSource(EDIT_VERTICES_SOURCE) as maplibregl.GeoJSONSource;
+      if (source) {
+        source.setData({ type: 'FeatureCollection', features });
+      } else {
+        // Add source and layers
+        map.addSource(EDIT_VERTICES_SOURCE, {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features },
+        });
+
+        // Outer glow (animated pulsing effect via CSS)
+        map.addLayer({
+          id: EDIT_VERTICES_GLOW,
+          type: 'circle',
+          source: EDIT_VERTICES_SOURCE,
+          paint: {
+            'circle-radius': 20,
+            'circle-color': '#00FFFF',
+            'circle-opacity': 0.3,
+            'circle-blur': 1,
+          },
+        });
+
+        // Middle ring
+        map.addLayer({
+          id: EDIT_VERTICES_OUTER,
+          type: 'circle',
+          source: EDIT_VERTICES_SOURCE,
+          paint: {
+            'circle-radius': 12,
+            'circle-color': '#00FFFF',
+            'circle-opacity': 0.6,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': '#FFFFFF',
+          },
+        });
+
+        // Inner bright dot
+        map.addLayer({
+          id: EDIT_VERTICES_INNER,
+          type: 'circle',
+          source: EDIT_VERTICES_SOURCE,
+          paint: {
+            'circle-radius': 6,
+            'circle-color': '#FFFFFF',
+            'circle-opacity': 1,
+          },
+        });
+      }
+    };
+
+    if (leftMap.loaded()) updateMapVertices(leftMap);
+    if (rightMap.loaded()) updateMapVertices(rightMap);
+  }, []);
+
+  // Remove edit vertices layers
+  const removeEditVerticesLayers = useCallback(() => {
+    const leftMap = leftMapRef.current;
+    const rightMap = rightMapRef.current;
+
+    const removeLayers = (map: maplibregl.Map) => {
+      if (map.getLayer(EDIT_VERTICES_INNER)) map.removeLayer(EDIT_VERTICES_INNER);
+      if (map.getLayer(EDIT_VERTICES_OUTER)) map.removeLayer(EDIT_VERTICES_OUTER);
+      if (map.getLayer(EDIT_VERTICES_GLOW)) map.removeLayer(EDIT_VERTICES_GLOW);
+      if (map.getSource(EDIT_VERTICES_SOURCE)) map.removeSource(EDIT_VERTICES_SOURCE);
+    };
+
+    if (leftMap) removeLayers(leftMap);
+    if (rightMap) removeLayers(rightMap);
+  }, []);
+
+  // Update site boundary display with new vertices
+  const updateBoundaryDisplay = useCallback((vertices: [number, number][]) => {
+    const leftMap = leftMapRef.current;
+    const rightMap = rightMapRef.current;
+    if (!leftMap || !rightMap || !siteGeometryRef.current) return;
+
+    const newGeometry = buildGeometryFromVertices(vertices, siteGeometryRef.current);
+
+    const updateSource = (map: maplibregl.Map) => {
+      const source = map.getSource(SITE_BOUNDARY_SOURCE) as maplibregl.GeoJSONSource;
+      if (source) {
+        source.setData({
+          type: 'Feature',
+          properties: {},
+          geometry: newGeometry,
+        });
+      }
+    };
+
+    updateSource(leftMap);
+    updateSource(rightMap);
+  }, [buildGeometryFromVertices]);
+
+  // Handle boundary edit mode changes
+  useEffect(() => {
+    const leftMap = leftMapRef.current;
+    const rightMap = rightMapRef.current;
+
+    if (!leftMap || !rightMap || !mapsReady.current.left || !mapsReady.current.right) {
+      return;
+    }
+
+    if (isBoundaryEditMode && siteGeometry) {
+      // Enter edit mode
+      const vertices = extractVertices(siteGeometry);
+      editVerticesRef.current = vertices;
+      updateEditVerticesLayer(vertices);
+
+      // Change cursor to indicate draggable points
+      leftMap.getCanvas().style.cursor = 'grab';
+      rightMap.getCanvas().style.cursor = 'grab';
+
+      // Set up drag handlers
+      const handleMouseDown = (e: maplibregl.MapMouseEvent, map: maplibregl.Map) => {
+        // Query for vertex points
+        const features = map.queryRenderedFeatures(e.point, {
+          layers: [EDIT_VERTICES_INNER, EDIT_VERTICES_OUTER, EDIT_VERTICES_GLOW],
+        });
+
+        if (features.length > 0) {
+          const vertexIndex = features[0].properties?.index;
+          if (typeof vertexIndex === 'number') {
+            draggingVertexIndexRef.current = vertexIndex;
+            map.getCanvas().style.cursor = 'grabbing';
+            // Disable map dragging while we drag the vertex
+            map.dragPan.disable();
+            e.preventDefault();
+          }
+        }
+      };
+
+      const handleMouseMove = (e: maplibregl.MapMouseEvent) => {
+        if (draggingVertexIndexRef.current !== null) {
+          const idx = draggingVertexIndexRef.current;
+          const newCoord: [number, number] = [e.lngLat.lng, e.lngLat.lat];
+          editVerticesRef.current[idx] = newCoord;
+          updateEditVerticesLayer(editVerticesRef.current);
+          updateBoundaryDisplay(editVerticesRef.current);
+        }
+      };
+
+      const handleMouseUp = () => {
+        if (draggingVertexIndexRef.current !== null) {
+          draggingVertexIndexRef.current = null;
+          leftMap.getCanvas().style.cursor = 'grab';
+          rightMap.getCanvas().style.cursor = 'grab';
+          leftMap.dragPan.enable();
+          rightMap.dragPan.enable();
+
+          // Notify parent of the updated geometry
+          if (onBoundaryUpdateRef.current && siteGeometryRef.current) {
+            const newGeometry = buildGeometryFromVertices(editVerticesRef.current, siteGeometryRef.current);
+            onBoundaryUpdateRef.current(newGeometry);
+          }
+        }
+      };
+
+      const onLeftMouseDown = (e: maplibregl.MapMouseEvent) => handleMouseDown(e, leftMap);
+      const onRightMouseDown = (e: maplibregl.MapMouseEvent) => handleMouseDown(e, rightMap);
+
+      leftMap.on('mousedown', onLeftMouseDown);
+      rightMap.on('mousedown', onRightMouseDown);
+      leftMap.on('mousemove', handleMouseMove);
+      rightMap.on('mousemove', handleMouseMove);
+      leftMap.on('mouseup', handleMouseUp);
+      rightMap.on('mouseup', handleMouseUp);
+
+      return () => {
+        leftMap.off('mousedown', onLeftMouseDown);
+        rightMap.off('mousedown', onRightMouseDown);
+        leftMap.off('mousemove', handleMouseMove);
+        rightMap.off('mousemove', handleMouseMove);
+        leftMap.off('mouseup', handleMouseUp);
+        rightMap.off('mouseup', handleMouseUp);
+        leftMap.getCanvas().style.cursor = '';
+        rightMap.getCanvas().style.cursor = '';
+      };
+    } else {
+      // Exit edit mode
+      removeEditVerticesLayers();
+      editVerticesRef.current = [];
+      draggingVertexIndexRef.current = null;
+      leftMap.getCanvas().style.cursor = '';
+      rightMap.getCanvas().style.cursor = '';
+    }
+  }, [isBoundaryEditMode, siteGeometry, extractVertices, updateEditVerticesLayer, removeEditVerticesLayers, updateBoundaryDisplay, buildGeometryFromVertices]);
 
   // Check if panel is unconfigured (no indicator selected)
   const isUnconfigured = !comparison.attribute;
@@ -1158,7 +1562,107 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
               }}
             />
           </Tooltip>
+
+          {/* Zoom to Site button - only show when site bounds are available */}
+          {siteBounds && (
+            <Tooltip label="Zoom to Site" placement="right">
+              <IconButton
+                aria-label="Zoom to site"
+                icon={<FiTarget />}
+                size="sm"
+                variant="solid"
+                bg="white"
+                color="gray.700"
+                onClick={zoomToSite}
+                boxShadow="md"
+                _hover={{
+                  bg: "gray.100"
+                }}
+              />
+            </Tooltip>
+          )}
         </VStack>
+      )}
+
+      {/* Boundary Edit Mode Overlay */}
+      {isBoundaryEditMode && (
+        <>
+          {/* Edit mode banner */}
+          <Flex
+            position="absolute"
+            top="60px"
+            left="50%"
+            transform="translateX(-50%)"
+            zIndex={15}
+            bg="rgba(0, 255, 255, 0.9)"
+            backdropFilter="blur(8px)"
+            px={6}
+            py={3}
+            borderRadius="full"
+            boxShadow="0 4px 20px rgba(0, 255, 255, 0.4)"
+            align="center"
+            gap={3}
+          >
+            <Box
+              w={3}
+              h={3}
+              borderRadius="full"
+              bg="white"
+              animation="pulse 1.5s infinite"
+              sx={{
+                '@keyframes pulse': {
+                  '0%, 100%': { opacity: 0.6, transform: 'scale(1)' },
+                  '50%': { opacity: 1, transform: 'scale(1.2)' },
+                },
+              }}
+            />
+            <Text color="gray.900" fontWeight="bold" fontSize="sm">
+              Edit Mode: Drag vertices to reshape boundary
+            </Text>
+          </Flex>
+
+          {/* Edit tools panel */}
+          <VStack
+            position="absolute"
+            top="120px"
+            right="10px"
+            zIndex={15}
+            spacing={2}
+            bg="rgba(0, 0, 0, 0.8)"
+            backdropFilter="blur(10px)"
+            p={3}
+            borderRadius="xl"
+            boxShadow="0 4px 20px rgba(0, 0, 0, 0.4)"
+          >
+            <Text fontSize="xs" fontWeight="bold" color="cyan.300" letterSpacing="wider">
+              CATCHMENTS
+            </Text>
+            <Tooltip label="Add catchments to boundary" placement="left">
+              <IconButton
+                aria-label="Add catchments"
+                icon={<FiPlus />}
+                size="sm"
+                variant="solid"
+                bg="green.500"
+                color="white"
+                _hover={{ bg: "green.400", transform: "scale(1.05)" }}
+                transition="all 0.2s"
+              />
+            </Tooltip>
+            <Tooltip label="Remove catchments from boundary" placement="left">
+              <IconButton
+                aria-label="Remove catchments"
+                icon={<FiMinus />}
+                size="sm"
+                variant="solid"
+                bg="red.500"
+                color="white"
+                _hover={{ bg: "red.400", transform: "scale(1.05)" }}
+                transition="all 0.2s"
+              />
+            </Tooltip>
+          </VStack>
+        </>
       )}
 
     </Box>

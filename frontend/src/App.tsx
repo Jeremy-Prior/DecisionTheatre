@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Box, Flex, useDisclosure } from '@chakra-ui/react';
 import ContentArea from './components/ContentArea';
 import ControlPanel from './components/ControlPanel';
@@ -43,14 +43,53 @@ function App() {
   const [mapExtent, setMapExtent] = useState<MapExtent | null>(null);
   const [isExploreMode, setIsExploreMode] = useState(() => loadCurrentPage() === 'explore');
   const [mapStatistics, setMapStatistics] = useState<MapStatistics | null>(null);
+  const [isBoundaryEditMode, setIsBoundaryEditMode] = useState(false);
   const { info } = useServerInfo();
 
-  // Persist state changes
+  // Persist state changes to local storage
   useEffect(() => { savePaneStates(paneStates); }, [paneStates]);
   useEffect(() => { saveLayoutMode(layoutMode); }, [layoutMode]);
   useEffect(() => { saveFocusedPane(focusedPane); }, [focusedPane]);
   useEffect(() => { saveCurrentPage(currentPage); }, [currentPage]);
   useEffect(() => { saveCurrentSite(currentSiteId); }, [currentSiteId]);
+
+  // Auto-save site state when user interacts with the map (debounced)
+  const siteAutoSaveTimerRef = useRef<number | null>(null);
+  const isLoadingSiteRef = useRef(false); // Prevent saving while loading
+
+  useEffect(() => {
+    // Don't save if no site is open, we're loading a site, or on create-site page
+    if (!currentSiteId || isLoadingSiteRef.current || currentPage === 'create-site') {
+      return;
+    }
+
+    // Clear any existing timer
+    if (siteAutoSaveTimerRef.current) {
+      clearTimeout(siteAutoSaveTimerRef.current);
+    }
+
+    // Debounce the save by 1 second to avoid spamming the API
+    siteAutoSaveTimerRef.current = window.setTimeout(() => {
+      // Save current state to the site via API
+      fetch(`/api/sites/${currentSiteId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paneStates,
+          layoutMode,
+          focusedPane,
+        }),
+      }).catch((err) => {
+        console.error('Failed to auto-save site state:', err);
+      });
+    }, 1000);
+
+    return () => {
+      if (siteAutoSaveTimerRef.current) {
+        clearTimeout(siteAutoSaveTimerRef.current);
+      }
+    };
+  }, [currentSiteId, paneStates, layoutMode, focusedPane, currentPage]);
 
   // Navigate to a page
   const handleNavigate = useCallback((page: AppPage) => {
@@ -79,10 +118,14 @@ function App() {
 
   // Open a site and go to map view
   const handleOpenSite = useCallback(async (site: Site) => {
+    // Prevent auto-save while loading site state
+    isLoadingSiteRef.current = true;
+
     setCurrentSiteId(site.id);
     setCurrentSite(site); // Store full site for title and bounds
     setIsExploreMode(false); // Exit explore mode when opening a site
-    // Load site state
+
+    // Load site state - restore pane states including indicator selections
     if (site.paneStates) {
       setPaneStates(site.paneStates);
     }
@@ -94,6 +137,11 @@ function App() {
     setFocusedPane(paneIdx);
     setIndicatorPaneIndex(paneIdx); // Always open side panel when opening a site
     setCurrentPage('map');
+
+    // Re-enable auto-save after a short delay to allow state to settle
+    setTimeout(() => {
+      isLoadingSiteRef.current = false;
+    }, 500);
   }, []);
 
   // Clone a site
@@ -173,6 +221,31 @@ function App() {
   const handleNavigateToCreateSite = useCallback(() => {
     setCurrentPage('create-site');
   }, []);
+
+  // Toggle boundary edit mode
+  const handleToggleBoundaryEdit = useCallback(() => {
+    setIsBoundaryEditMode(prev => !prev);
+  }, []);
+
+  // Handle geometry update from boundary editing
+  const handleBoundaryUpdate = useCallback(async (newGeometry: GeoJSON.Geometry) => {
+    if (!currentSiteId) return;
+
+    try {
+      const response = await fetch(`/api/sites/${currentSiteId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ geometry: newGeometry }),
+      });
+
+      if (response.ok) {
+        const updatedSite = await response.json();
+        setCurrentSite(updatedSite);
+      }
+    } catch (err) {
+      console.error('Failed to update site boundary:', err);
+    }
+  }, [currentSiteId]);
 
   const isIndicatorOpen = indicatorPaneIndex !== null;
 
@@ -269,6 +342,8 @@ function App() {
         onNavigate={handleNavigate}
         currentPage={currentPage}
         siteTitle={currentSite?.title}
+        onEditBoundary={currentSite ? handleToggleBoundaryEdit : undefined}
+        isBoundaryEditMode={isBoundaryEditMode}
       />
 
       <Flex flex={1} overflow="hidden" position="relative">
@@ -286,11 +361,15 @@ function App() {
             onFocusPane={handleFocusPane}
             onGoQuad={handleGoQuad}
             onIdentify={handleIdentify}
+            identifyResult={identifyResult}
             onMapExtentChange={handleMapExtentChange}
             onStatisticsChange={handleStatisticsChange}
             isPanelOpen={isIndicatorOpen}
             siteId={currentSiteId}
             siteBounds={currentSite?.boundingBox}
+            isBoundaryEditMode={isBoundaryEditMode}
+            siteGeometry={currentSite?.geometry}
+            onBoundaryUpdate={handleBoundaryUpdate}
           />
         </Box>
 

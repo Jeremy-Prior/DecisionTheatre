@@ -554,6 +554,71 @@ func convertToPolygonCoords(rings []interface{}) [][][2]float64 {
 	return result
 }
 
+// GetCatchmentAttributes returns all attributes for a specific catchment across both scenarios
+// Returns a map: scenario -> attribute -> value
+func (s *GpkgStore) GetCatchmentAttributes(catchmentID string) map[string]map[string]float64 {
+	result := make(map[string]map[string]float64)
+
+	// Query both scenario tables
+	scenarios := []string{"current", "reference"}
+	for _, scenario := range scenarios {
+		tableName := "scenario_" + scenario
+		attrs := make(map[string]float64)
+
+		// Get all columns for this scenario
+		s.mu.RLock()
+		columns := s.columns
+		s.mu.RUnlock()
+
+		if len(columns) == 0 {
+			continue
+		}
+
+		// Build SELECT query for all columns
+		quotedCols := make([]string, len(columns))
+		for i, col := range columns {
+			quotedCols[i] = fmt.Sprintf(`"%s"`, col)
+		}
+
+		query := fmt.Sprintf(`SELECT %s FROM %s WHERE catchment_id = ?`,
+			strings.Join(quotedCols, ", "), tableName)
+
+		row := s.db.QueryRow(query, catchmentID)
+
+		// Create a slice of interface{} for scanning
+		values := make([]sql.NullFloat64, len(columns))
+		scanArgs := make([]interface{}, len(columns))
+		for i := range values {
+			scanArgs[i] = &values[i]
+		}
+
+		if err := row.Scan(scanArgs...); err != nil {
+			// Try with integer ID
+			intID := catchmentID
+			// Remove leading zeros or non-numeric chars if needed
+			query = fmt.Sprintf(`SELECT %s FROM %s WHERE catchment_id_int = ?`,
+				strings.Join(quotedCols, ", "), tableName)
+			row = s.db.QueryRow(query, intID)
+			if err := row.Scan(scanArgs...); err != nil {
+				continue
+			}
+		}
+
+		// Build attributes map
+		for i, col := range columns {
+			if values[i].Valid {
+				attrs[col] = values[i].Float64
+			}
+		}
+
+		if len(attrs) > 0 {
+			result[scenario] = attrs
+		}
+	}
+
+	return result
+}
+
 // GetCatchmentsByIDs returns catchment geometries for the given IDs
 func (s *GpkgStore) GetCatchmentsByIDs(ids []string) ([]GeoJSONFeature, error) {
 	if len(ids) == 0 {
