@@ -186,3 +186,79 @@ air
 # Terminal 2
 cd frontend && npx vite
 ```
+
+## Design System Workflow
+
+The project includes tools for collaborating with designers using Figma. Design tokens (colors, typography, spacing) can be exported and imported to keep the codebase synchronized with design specifications.
+
+### Files for Designers
+
+| File | Purpose |
+|------|---------|
+| `design-tokens.json` | Design tokens in standard JSON format for Figma Tokens Studio plugin |
+| `design-system.html` | Visual reference document showing all colors, typography, and components |
+
+### Sending Design Specifications to a Designer
+
+```bash
+make design-export
+```
+
+This shows the files to share with your designer:
+
+1. **design-tokens.json** - Import into Figma using [Tokens Studio](https://tokens.studio/) plugin
+2. **design-system.html** - Open in browser for visual reference
+
+### Importing Updated Tokens from Figma
+
+When the designer exports updated tokens from Figma:
+
+```bash
+# Preview changes without modifying files (dry run)
+make design-preview TOKENS=~/Downloads/updated-tokens.json
+
+# Apply the changes to theme.ts
+make design-import TOKENS=~/Downloads/updated-tokens.json
+
+# Rebuild frontend with new theme
+make build-frontend
+```
+
+### Design Token Structure
+
+The design tokens include:
+
+| Category | Description |
+|----------|-------------|
+| **Brand colors** | Primary cyan-blue palette (50-900 shades) |
+| **Accent colors** | Secondary orange palette (50-900 shades) |
+| **Scenario colors** | Reference (orange), Current (blue), Future (green) |
+| **Site creation colors** | Neon palette for boundary drawing UI |
+| **PRISM color scale** | 8-color choropleth spectrum for data visualization |
+| **Typography** | Inter font family with size/weight scales |
+| **Spacing** | 4px base unit spacing scale |
+| **Shadows** | Standard shadows and glow effects |
+| **Border radius** | Rounded corner scale |
+
+### Theme File Location
+
+The Chakra UI theme is defined in:
+
+```
+frontend/src/styles/theme.ts
+```
+
+The import script also generates CSS custom properties in:
+
+```
+frontend/src/styles/design-tokens.css
+```
+
+### Make Commands
+
+| Command | Description |
+|---------|-------------|
+| `make design-export` | Show files to send to designer |
+| `make design-import` | Import tokens and regenerate theme.ts |
+| `make design-preview` | Dry run - preview changes without writing |
+| `make design-import TOKENS=path/to/file.json` | Import from specific file |

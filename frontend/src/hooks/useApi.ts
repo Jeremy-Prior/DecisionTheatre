@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { Scenario, ServerInfo, Project } from '../types';
+import type { Scenario, ServerInfo, Site } from '../types';
 
 const API_BASE = '/api';
 
@@ -120,18 +120,18 @@ export function useComparisonData(
   return { data, loading, error };
 }
 
-// Project management hooks
-export function useProjects() {
-  const [projects, setProjects] = useState<Project[]>([]);
+// Site management hooks
+export function useSites() {
+  const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchProjects = useCallback(async () => {
+  const fetchSites = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchJSON<Project[]>(`${API_BASE}/projects`);
-      setProjects(result || []);
+      const result = await fetchJSON<Site[]>(`${API_BASE}/sites`);
+      setSites(result || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
@@ -140,46 +140,46 @@ export function useProjects() {
   }, []);
 
   useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+    fetchSites();
+  }, [fetchSites]);
 
-  return { projects, loading, error, refetch: fetchProjects };
+  return { sites, loading, error, refetch: fetchSites };
 }
 
-export async function createProject(
-  data: Partial<Project>
-): Promise<Project> {
-  const response = await fetch(`${API_BASE}/projects`, {
+export async function createSite(
+  data: Partial<Site>
+): Promise<Site> {
+  const response = await fetch(`${API_BASE}/sites`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error(`Failed to create project: ${response.statusText}`);
+    throw new Error(`Failed to create site: ${response.statusText}`);
   }
   return response.json();
 }
 
-export async function updateProject(
+export async function updateSite(
   id: string,
-  data: Partial<Project>
-): Promise<Project> {
-  const response = await fetch(`${API_BASE}/projects/${id}`, {
+  data: Partial<Site>
+): Promise<Site> {
+  const response = await fetch(`${API_BASE}/sites/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    throw new Error(`Failed to update project: ${response.statusText}`);
+    throw new Error(`Failed to update site: ${response.statusText}`);
   }
   return response.json();
 }
 
-export async function deleteProject(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/projects/${id}`, {
+export async function deleteSite(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/sites/${id}`, {
     method: 'DELETE',
   });
   if (!response.ok) {
-    throw new Error(`Failed to delete project: ${response.statusText}`);
+    throw new Error(`Failed to delete site: ${response.statusText}`);
   }
 }

@@ -111,25 +111,12 @@ export const SCENARIOS: ScenarioInfo[] = [
 ];
 
 // ============================================================================
-// Project Management Types
+// Site Management Types
 // ============================================================================
 
 export interface MapExtent {
   center: [number, number]; // [lng, lat]
   zoom: number;
-}
-
-export interface Project {
-  id: string;
-  title: string;
-  description: string;
-  thumbnail: string | null;
-  createdAt: string;
-  updatedAt: string;
-  paneStates: PaneStates;
-  layoutMode: LayoutMode;
-  focusedPane: number;
-  mapExtent?: MapExtent;
 }
 
 // Identify result: scenario -> attribute -> value
@@ -138,7 +125,7 @@ export type IdentifyResult = {
   data: Record<string, Record<string, number>>;
 } | null;
 
-export type AppPage = 'landing' | 'about' | 'projects' | 'create' | 'create-site' | 'map' | 'explore';
+export type AppPage = 'landing' | 'about' | 'sites' | 'create-site' | 'map' | 'explore';
 
 // Statistics for the visible zone (viewport)
 export interface ZoneStats {
@@ -161,21 +148,21 @@ export interface MapStatistics {
   rightStats: ZoneStats | null;
 }
 
-const STORAGE_CURRENT_PROJECT_KEY = 'dt-current-project';
+const STORAGE_CURRENT_SITE_KEY = 'dt-current-site';
 const STORAGE_CURRENT_PAGE_KEY = 'dt-current-page';
 
-export function loadCurrentProject(): string | null {
+export function loadCurrentSite(): string | null {
   try {
-    return localStorage.getItem(STORAGE_CURRENT_PROJECT_KEY);
+    return localStorage.getItem(STORAGE_CURRENT_SITE_KEY);
   } catch { return null; }
 }
 
-export function saveCurrentProject(projectId: string | null): void {
+export function saveCurrentSite(siteId: string | null): void {
   try {
-    if (projectId) {
-      localStorage.setItem(STORAGE_CURRENT_PROJECT_KEY, projectId);
+    if (siteId) {
+      localStorage.setItem(STORAGE_CURRENT_SITE_KEY, siteId);
     } else {
-      localStorage.removeItem(STORAGE_CURRENT_PROJECT_KEY);
+      localStorage.removeItem(STORAGE_CURRENT_SITE_KEY);
     }
   } catch { /* ignore */ }
 }
@@ -183,7 +170,7 @@ export function saveCurrentProject(projectId: string | null): void {
 export function loadCurrentPage(): AppPage {
   try {
     const raw = localStorage.getItem(STORAGE_CURRENT_PAGE_KEY);
-    if (raw === 'landing' || raw === 'about' || raw === 'projects' || raw === 'create' || raw === 'create-site' || raw === 'map' || raw === 'explore') {
+    if (raw === 'landing' || raw === 'about' || raw === 'sites' || raw === 'create-site' || raw === 'map' || raw === 'explore') {
       return raw;
     }
   } catch { /* default */ }
@@ -194,10 +181,6 @@ export function saveCurrentPage(page: AppPage): void {
   try { localStorage.setItem(STORAGE_CURRENT_PAGE_KEY, page); } catch { /* ignore */ }
 }
 
-// ============================================================================
-// Site Management Types
-// ============================================================================
-
 export type SiteCreationMethod = 'shapefile' | 'geojson' | 'drawn' | 'catchments';
 
 export interface BoundingBox {
@@ -207,22 +190,31 @@ export interface BoundingBox {
   maxY: number;  // North
 }
 
+// Site represents a saved site with its boundary and map state
 export interface Site {
   id: string;
-  name: string;
+  title: string;
   description: string;
   thumbnail: string | null;
-  geometry: GeoJSON.Geometry | null;
-  boundingBox: BoundingBox | null;
-  area: number;  // Area in square kilometers
-  creationMethod: SiteCreationMethod;
-  catchmentIds: string[];  // If created from catchments
   createdAt: string;
   updatedAt: string;
+
+  // Map state
+  paneStates?: PaneStates;
+  layoutMode?: LayoutMode;
+  focusedPane?: number;
+  mapExtent?: MapExtent;
+
+  // Site boundary (geometry)
+  geometry?: GeoJSON.Geometry | null;
+  boundingBox?: BoundingBox | null;
+  area?: number;  // Area in square kilometers
+  creationMethod?: SiteCreationMethod;
+  catchmentIds?: string[];  // If created from catchments
 }
 
 export interface CreateSiteRequest {
-  name: string;
+  title: string;
   description?: string;
   thumbnail?: string | null;
   geometry: GeoJSON.Geometry;

@@ -188,6 +188,31 @@ function ControlPanel({
         </Box>
 
         <VStack spacing={6} p={6} align="stretch">
+          {/* Create Site button - shown prominently at top in explore mode */}
+          {isExploreMode && onNavigateToCreateSite && (
+            <Box>
+              <Button
+                size="lg"
+                width="100%"
+                leftIcon={<FiMapPin />}
+                onClick={onNavigateToCreateSite}
+                bgGradient="linear(to-r, cyan.400, purple.500)"
+                color="white"
+                _hover={{
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 10px 30px -10px rgba(0, 255, 255, 0.5)',
+                  bgGradient: 'linear(to-r, cyan.300, purple.400)',
+                }}
+                transition="all 0.2s"
+              >
+                Create Site
+              </Button>
+              <Text fontSize="xs" color="gray.500" mt={2} textAlign="center">
+                Define a site boundary for your analysis
+              </Text>
+            </Box>
+          )}
+
           {/* Title */}
           <Box>
             <HStack mb={1}>
@@ -387,34 +412,6 @@ function ControlPanel({
                     </Tbody>
                   </Table>
                 </Box>
-              </Box>
-            </>
-          )}
-
-          {/* Create Project button - shown in explore mode, starts site creation flow */}
-          {isExploreMode && onNavigateToCreateSite && (
-            <>
-              <Divider />
-              <Box>
-                <Button
-                  size="lg"
-                  width="100%"
-                  leftIcon={<FiMapPin />}
-                  onClick={onNavigateToCreateSite}
-                  bgGradient="linear(to-r, cyan.400, purple.500)"
-                  color="white"
-                  _hover={{
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 10px 30px -10px rgba(0, 255, 255, 0.5)',
-                    bgGradient: 'linear(to-r, cyan.300, purple.400)',
-                  }}
-                  transition="all 0.2s"
-                >
-                  Create Project
-                </Button>
-                <Text fontSize="xs" color="gray.500" mt={2} textAlign="center">
-                  Define a site boundary and save as a project
-                </Text>
               </Box>
             </>
           )}

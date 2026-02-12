@@ -1,7 +1,7 @@
 import { Box } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ViewPane from './ViewPane';
-import type { LayoutMode, PaneStates, IdentifyResult, MapExtent, MapStatistics } from '../types';
+import type { LayoutMode, PaneStates, IdentifyResult, MapExtent, MapStatistics, BoundingBox } from '../types';
 
 interface ContentAreaProps {
   mode: LayoutMode;
@@ -12,6 +12,9 @@ interface ContentAreaProps {
   onIdentify?: (result: IdentifyResult) => void;
   onMapExtentChange?: (extent: MapExtent) => void;
   onStatisticsChange?: (stats: MapStatistics) => void;
+  isPanelOpen?: boolean;
+  siteId?: string | null;
+  siteBounds?: BoundingBox | null;
 }
 
 const paneVariants = {
@@ -45,6 +48,9 @@ function ContentArea({
   onIdentify,
   onMapExtentChange,
   onStatisticsChange,
+  isPanelOpen,
+  siteId,
+  siteBounds,
 }: ContentAreaProps) {
   const isQuad = mode === 'quad';
 
@@ -78,6 +84,8 @@ function ContentArea({
               onFocusPane={onFocusPane}
               onGoQuad={onGoQuad}
               onIdentify={onIdentify}
+              siteId={siteId}
+              siteBounds={siteBounds}
             />
           </Box>
           <AnimatePresence>
@@ -99,6 +107,8 @@ function ContentArea({
                   onFocusPane={onFocusPane}
                   onGoQuad={onGoQuad}
                   onIdentify={onIdentify}
+                  siteId={siteId}
+                  siteBounds={siteBounds}
                 />
               </motion.div>
             ))}
@@ -121,6 +131,9 @@ function ContentArea({
             onIdentify={onIdentify}
             onMapExtentChange={onMapExtentChange}
             onStatisticsChange={onStatisticsChange}
+            isPanelOpen={isPanelOpen}
+            siteId={siteId}
+            siteBounds={siteBounds}
           />
         </Box>
       )}

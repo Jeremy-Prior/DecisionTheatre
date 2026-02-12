@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Build a data pack zip from local data/ and resources/ directories.
-# Usage: ./scripts/build-datapack.sh [version]
+# Usage: ./scripts/package-data.sh [version]
 #
 # The data pack bundles:
 #   - Parquet files (converted from CSVs via csv2parquet.py)

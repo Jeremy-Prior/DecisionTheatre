@@ -68,7 +68,7 @@ make datapack
 Or directly:
 
 ```bash
-./scripts/build-datapack.sh [version]
+./scripts/package-data.sh [version]
 ```
 
 This:

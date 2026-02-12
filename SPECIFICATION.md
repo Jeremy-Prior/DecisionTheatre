@@ -2,7 +2,7 @@
 
 ## Overview
 
-Decision Theatre is a desktop application for comparing and analyzing environmental scenarios across geographical catchments. It provides an intuitive interface for exploring data, creating sites, and managing projects.
+Decision Theatre is a desktop application for comparing and analyzing environmental scenarios across geographical catchments. It provides an intuitive interface for exploring data and creating sites (geographical areas) for analysis.
 
 ## Application Architecture
 
@@ -12,7 +12,7 @@ Decision Theatre is a desktop application for comparing and analyzing environmen
 - **Data Storage**:
   - GeoPackage (SQLite with spatial extensions) for catchment data
   - MBTiles for vector tiles
-  - JSON files for projects and sites
+  - JSON files for sites
 
 ### Frontend (React + TypeScript)
 
@@ -27,7 +27,7 @@ Decision Theatre is a desktop application for comparing and analyzing environmen
 
 ### 1. Explore Mode
 
-Users can explore catchment data without creating a project:
+Users can explore catchment data:
 - Dual-map comparison with slider
 - Scenario selection (Reference, Current, Future)
 - Attribute/indicator visualization
@@ -35,20 +35,38 @@ Users can explore catchment data without creating a project:
 - Identify tool for querying catchment attributes
 - Zone statistics for visible area
 
-### 2. Project Management
+### 2. Site Management
 
-Projects save the user's exploration state for later retrieval:
-- **Create**: From explore mode with current settings
-- **Clone**: Duplicate existing projects
-- **Delete**: Remove projects (with confirmation)
-- **Open**: Restore saved state and continue working
+Sites are geographical areas that save the user's boundary and exploration state:
 
-Project data includes:
+**Workflow:**
+1. User explores map
+2. Clicks "Create Site" button in sidebar
+3. Chooses one of 4 boundary definition methods
+4. Provides title, description, and optional thumbnail image
+5. Site is saved and can be opened later
+
+**Site data includes:**
 - Title and description
-- Thumbnail image (auto-cropped to 16:9)
+- Thumbnail image (auto-generated from map or user-uploaded, stored as base64)
+- Site boundary geometry
+- Bounding box and area
+- Creation method
 - Pane states (scenarios and attributes)
 - Layout mode (single/quad)
 - Map extent (center, zoom)
+
+**Site Gallery (CRUD Operations):**
+- **Create**: New sites via the "Create New Site" button
+- **Read**: Sites displayed in a grid view with thumbnails
+- **Update**: Edit button on each site card opens the site details form
+- **Delete**: Delete button with confirmation dialog
+- **Clone**: Copy existing site configuration for quick reuse
+
+**When Opening a Site:**
+- Map zooms to site bounds with 10% padding
+- Site title displayed in header breadcrumb
+- Site boundary displayed with glowing neon effect overlay
 
 ### 3. Site Creation
 
@@ -74,6 +92,7 @@ Sites define geographical areas for analysis. Four creation methods:
 #### 3.4 Catchment Selection
 - Click catchments to select/deselect
 - Visual highlight for selected catchments
+- Geometries from GeoPackage (full resolution, not tiles)
 - API dissolves selected catchments into boundary
 - Result is a MultiPolygon covering selected area
 
@@ -81,16 +100,24 @@ Sites define geographical areas for analysis. Four creation methods:
 ```typescript
 interface Site {
   id: string;
-  name: string;
+  title: string;
   description: string;
   thumbnail: string | null;
-  geometry: GeoJSON.Geometry;
-  boundingBox: BoundingBox;
-  area: number; // km²
-  creationMethod: 'shapefile' | 'geojson' | 'drawn' | 'catchments';
-  catchmentIds: string[]; // if created from catchments
   createdAt: string;
   updatedAt: string;
+
+  // Map state
+  paneStates?: PaneStates;
+  layoutMode?: string;
+  focusedPane?: number;
+  mapExtent?: MapExtent;
+
+  // Site boundary
+  geometry?: GeoJSON.Geometry;
+  boundingBox?: BoundingBox;
+  area?: number; // km²
+  creationMethod?: 'shapefile' | 'geojson' | 'drawn' | 'catchments';
+  catchmentIds?: string[]; // if created from catchments
 }
 ```
 
@@ -101,9 +128,8 @@ interface Site {
 ### Navigation Pages
 - **Landing**: Welcome screen with options
 - **About**: Information about the application
-- **Projects**: Grid view of saved projects
-- **Create Project**: Form for new project with thumbnail
-- **Create Site**: Multi-step site creation wizard
+- **Sites**: Grid view of saved sites
+- **Create Site**: 3-step site creation wizard (Method → Boundary → Details)
 - **Map**: Main exploration/analysis view
 
 ### Map View
@@ -121,7 +147,7 @@ interface Site {
 - Color scale legend
 - Zone statistics
 - Identify results table
-- Create Site / Create Project buttons (in explore mode)
+- Create Site button (in explore mode)
 
 ---
 
@@ -142,13 +168,6 @@ interface Site {
 - `GET /api/choropleth` - GeoJSON for viewport
 - `GET /api/catchment/{id}` - Catchment details
 
-### Projects
-- `GET /api/projects` - List all projects
-- `POST /api/projects` - Create project
-- `GET /api/projects/{id}` - Get project
-- `PUT /api/projects/{id}` - Update project
-- `DELETE /api/projects/{id}` - Delete project
-
 ### Sites
 - `GET /api/sites` - List all sites
 - `POST /api/sites` - Create site
@@ -157,18 +176,20 @@ interface Site {
 - `DELETE /api/sites/{id}` - Delete site
 - `POST /api/sites/dissolve-catchments` - Merge catchments into boundary
 
+### Catchments
+- `GET /api/catchments/geometry/{id}` - Get full catchment geometry from GeoPackage
+
 ---
 
 ## Data Storage
 
 ### File Locations
-- `data/projects/` - Project JSON files
 - `data/sites/` - Site JSON files
-- `data/images/` - Thumbnails (project and site)
+- `data/images/` - Site thumbnails
 - `data/datapack.gpkg` - Catchment geometries and scenario data
 
 ### GeoPackage Tables
-- `catchments_lev12` - Catchment polygons with HYBAS_ID
+- `catchments_lev12` - Catchment polygons with HYBAS_ID and geojson column
 - `scenario_current` - Current scenario attributes
 - `scenario_reference` - Reference scenario attributes
 - `domain_minima` - Minimum values per attribute

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Landscape Decision Theatre - Design System</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', -apple-system, sans-serif; background: #1a202c; color: #fff; padding: 40px; }
+    h1 { font-size: 36px; margin-bottom: 8px; background: linear-gradient(to right, #2bb0ed, #ff9800); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    h2 { font-size: 24px; margin: 40px 0 20px; color: #e2e8f0; border-bottom: 1px solid #4a5568; padding-bottom: 10px; }
+    h3 { font-size: 18px; margin: 24px 0 12px; color: #a0aec0; }
+    p { color: #718096; margin-bottom: 20px; }
+    .section { margin-bottom: 60px; }
+
+    /* Color Swatches */
+    .color-palette { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+    .color-swatch {
+      width: 80px; height: 80px; border-radius: 8px; display: flex; flex-direction: column;
+      justify-content: flex-end; padding: 8px; font-size: 10px; position: relative;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .color-swatch .name { font-weight: 600; color: inherit; }
+    .color-swatch .hex { opacity: 0.8; }
+    .color-swatch.light-text { color: #fff; }
+    .color-swatch.dark-text { color: #1a202c; }
+
+    /* Large color blocks */
+    .color-block {
+      display: inline-flex; align-items: center; gap: 16px; padding: 20px 24px;
+      border-radius: 12px; margin: 8px; min-width: 200px;
+    }
+    .color-block .info { display: flex; flex-direction: column; }
+    .color-block .name { font-weight: 600; font-size: 16px; }
+    .color-block .hex { font-size: 14px; opacity: 0.8; }
+    .color-block .desc { font-size: 12px; opacity: 0.6; margin-top: 4px; }
+
+    /* Gradient samples */
+    .gradient-sample {
+      padding: 20px 30px; border-radius: 12px; margin: 8px 0; display: inline-block;
+      color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    }
+
+    /* Typography samples */
+    .type-sample { margin: 16px 0; padding: 12px 0; border-bottom: 1px solid #2d3748; }
+    .type-sample .size { color: #718096; font-size: 12px; margin-bottom: 4px; }
+
+    /* Spacing samples */
+    .spacing-grid { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+    .spacing-box {
+      background: #4299e1; display: flex; align-items: center; justify-content: center;
+      font-size: 10px; color: #fff; border-radius: 4px;
+    }
+
+    /* Shadow samples */
+    .shadow-sample {
+      background: #2d3748; padding: 24px 32px; border-radius: 12px; margin: 12px;
+      display: inline-block; min-width: 150px; text-align: center;
+    }
+    .shadow-sample .name { font-size: 14px; color: #a0aec0; }
+
+    /* Component samples */
+    .button-sample {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 12px 24px; border-radius: 8px; font-weight: 600; margin: 8px;
+      cursor: pointer; border: none; font-family: inherit;
+    }
+
+    table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+    th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #2d3748; }
+    th { color: #a0aec0; font-weight: 600; font-size: 12px; text-transform: uppercase; }
+    td { color: #e2e8f0; }
+    code { background: #2d3748; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<h1>Landscape Decision Theatre</h1>
+<p>Design System &amp; Style Guide for Figma Export</p>
+
+<!-- BRAND COLORS -->
+<section class="section">
+  <h2>Brand Colors</h2>
+
+  <h3>Primary (Brand - Cyan Blue)</h3>
+  <div class="color-palette">
+    <div class="color-swatch dark-text" style="background:#e3f8ff"><span class="name">50</span><span class="hex">#e3f8ff</span></div>
+    <div class="color-swatch dark-text" style="background:#b3ecff"><span class="name">100</span><span class="hex">#b3ecff</span></div>
+    <div class="color-swatch dark-text" style="background:#81defd"><span class="name">200</span><span class="hex">#81defd</span></div>
+    <div class="color-swatch dark-text" style="background:#5ed0fa"><span class="name">300</span><span class="hex">#5ed0fa</span></div>
+    <div class="color-swatch dark-text" style="background:#40c3f7"><span class="name">400</span><span class="hex">#40c3f7</span></div>
+    <div class="color-swatch light-text" style="background:#2bb0ed"><span class="name">500</span><span class="hex">#2bb0ed</span></div>
+    <div class="color-swatch light-text" style="background:#1992d4"><span class="name">600</span><span class="hex">#1992d4</span></div>
+    <div class="color-swatch light-text" style="background:#127fbf"><span class="name">700</span><span class="hex">#127fbf</span></div>
+    <div class="color-swatch light-text" style="background:#0b69a3"><span class="name">800</span><span class="hex">#0b69a3</span></div>
+    <div class="color-swatch light-text" style="background:#035388"><span class="name">900</span><span class="hex">#035388</span></div>
+  </div>
+
+  <h3>Accent (Orange)</h3>
+  <div class="color-palette">
+    <div class="color-swatch dark-text" style="background:#fff3e0"><span class="name">50</span><span class="hex">#fff3e0</span></div>
+    <div class="color-swatch dark-text" style="background:#ffe0b2"><span class="name">100</span><span class="hex">#ffe0b2</span></div>
+    <div class="color-swatch dark-text" style="background:#ffcc80"><span class="name">200</span><span class="hex">#ffcc80</span></div>
+    <div class="color-swatch dark-text" style="background:#ffb74d"><span class="name">300</span><span class="hex">#ffb74d</span></div>
+    <div class="color-swatch dark-text" style="background:#ffa726"><span class="name">400</span><span class="hex">#ffa726</span></div>
+    <div class="color-swatch dark-text" style="background:#ff9800"><span class="name">500</span><span class="hex">#ff9800</span></div>
+    <div class="color-swatch light-text" style="background:#fb8c00"><span class="name">600</span><span class="hex">#fb8c00</span></div>
+    <div class="color-swatch light-text" style="background:#f57c00"><span class="name">700</span><span class="hex">#f57c00</span></div>
+    <div class="color-swatch light-text" style="background:#ef6c00"><span class="name">800</span><span class="hex">#ef6c00</span></div>
+    <div class="color-swatch light-text" style="background:#e65100"><span class="name">900</span><span class="hex">#e65100</span></div>
+  </div>
+</section>
+
+<!-- SCENARIO COLORS -->
+<section class="section">
+  <h2>Scenario Colors</h2>
+  <div>
+    <div class="color-block light-text" style="background:#e65100">
+      <div class="info"><span class="name">Reference</span><span class="hex">#e65100</span><span class="desc">Baseline scenario</span></div>
+    </div>
+    <div class="color-block light-text" style="background:#2bb0ed">
+      <div class="info"><span class="name">Current</span><span class="hex">#2bb0ed</span><span class="desc">Current state scenario</span></div>
+    </div>
+    <div class="color-block light-text" style="background:#4caf50">
+      <div class="info"><span class="name">Future</span><span class="hex">#4caf50</span><span class="desc">Future projection scenario</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- SITE CREATION COLORS -->
+<section class="section">
+  <h2>Site Creation Colors</h2>
+  <p>Bright, neon colors for site boundary creation UI</p>
+  <div>
+    <div class="color-block dark-text" style="background:#00FFFF">
+      <div class="info"><span class="name">Primary</span><span class="hex">#00FFFF</span><span class="desc">Cyan - Main boundary</span></div>
+    </div>
+    <div class="color-block light-text" style="background:#FF00FF">
+      <div class="info"><span class="name">Secondary</span><span class="hex">#FF00FF</span><span class="desc">Magenta - Highlights</span></div>
+    </div>
+    <div class="color-block dark-text" style="background:#FFFF00">
+      <div class="info"><span class="name">Accent</span><span class="hex">#FFFF00</span><span class="desc">Yellow - Accents</span></div>
+    </div>
+    <div class="color-block dark-text" style="background:#00FF88">
+      <div class="info"><span class="name">Glow</span><span class="hex">#00FF88</span><span class="desc">Electric green - Glow effects</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRISM COLOR SCALE -->
+<section class="section">
+  <h2>PRISM Color Scale (Choropleth)</h2>
+  <p>8-color spectrum for data visualization on maps</p>
+  <div style="display:flex; border-radius:8px; overflow:hidden; margin:16px 0;">
+    <div style="flex:1; height:60px; background:#6a0dad; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px;">Violet<br>#6a0dad</div>
+    <div style="flex:1; height:60px; background:#4b0082; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px;">Indigo<br>#4b0082</div>
+    <div style="flex:1; height:60px; background:#0074d9; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px;">Blue<br>#0074d9</div>
+    <div style="flex:1; height:60px; background:#00bcd4; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px;">Cyan<br>#00bcd4</div>
+    <div style="flex:1; height:60px; background:#2ecc40; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px;">Green<br>#2ecc40</div>
+    <div style="flex:1; height:60px; background:#ffdc00; display:flex; align-items:center; justify-content:center; color:#1a202c; font-size:11px;">Yellow<br>#ffdc00</div>
+    <div style="flex:1; height:60px; background:#ff851b; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px;">Orange<br>#ff851b</div>
+    <div style="flex:1; height:60px; background:#e8003f; display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px;">Red<br>#e8003f</div>
+  </div>
+</section>
+
+<!-- GRAY SCALE -->
+<section class="section">
+  <h2>Gray Scale</h2>
+  <div class="color-palette">
+    <div class="color-swatch dark-text" style="background:#F7FAFC"><span class="name">50</span><span class="hex">#F7FAFC</span></div>
+    <div class="color-swatch dark-text" style="background:#EDF2F7"><span class="name">100</span><span class="hex">#EDF2F7</span></div>
+    <div class="color-swatch dark-text" style="background:#E2E8F0"><span class="name">200</span><span class="hex">#E2E8F0</span></div>
+    <div class="color-swatch dark-text" style="background:#CBD5E0"><span class="name">300</span><span class="hex">#CBD5E0</span></div>
+    <div class="color-swatch dark-text" style="background:#A0AEC0"><span class="name">400</span><span class="hex">#A0AEC0</span></div>
+    <div class="color-swatch light-text" style="background:#718096"><span class="name">500</span><span class="hex">#718096</span></div>
+    <div class="color-swatch light-text" style="background:#4A5568"><span class="name">600</span><span class="hex">#4A5568</span></div>
+    <div class="color-swatch light-text" style="background:#2D3748"><span class="name">700</span><span class="hex">#2D3748</span></div>
+    <div class="color-swatch light-text" style="background:#1A202C"><span class="name">800</span><span class="hex">#1A202C</span></div>
+    <div class="color-swatch light-text" style="background:#171923"><span class="name">900</span><span class="hex">#171923</span></div>
+  </div>
+</section>
+
+<!-- GRADIENTS -->
+<section class="section">
+  <h2>Gradients</h2>
+  <div>
+    <div class="gradient-sample" style="background:linear-gradient(to right, #2bb0ed, #ff9800)">
+      <strong>Brand Header</strong><br>
+      <span style="font-size:12px">linear-gradient(to right, #2bb0ed, #ff9800)</span>
+    </div>
+  </div>
+  <div>
+    <div class="gradient-sample" style="background:linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #0d0d1f 100%)">
+      <strong>Site Creation Background</strong><br>
+      <span style="font-size:12px">linear-gradient(135deg, #0a0a1a, #1a1a2e, #0d0d1f)</span>
+    </div>
+  </div>
+  <div>
+    <div class="gradient-sample" style="background:linear-gradient(135deg, rgba(0, 255, 255, 0.3) 0%, rgba(128, 0, 255, 0.3) 100%)">
+      <strong>Card Highlight</strong><br>
+      <span style="font-size:12px">Cyan to Purple (30% opacity)</span>
+    </div>
+  </div>
+  <div>
+    <div class="gradient-sample" style="background:linear-gradient(135deg, #3182ce 0%, #63b3ed 100%)">
+      <strong>Button Primary</strong><br>
+      <span style="font-size:12px">linear-gradient(135deg, #3182ce, #63b3ed)</span>
+    </div>
+  </div>
+</section>
+
+<!-- TYPOGRAPHY -->
+<section class="section">
+  <h2>Typography</h2>
+  <p>Font Family: <code>Inter</code> (with system fallbacks)</p>
+
+  <div class="type-sample">
+    <div class="size">6xl - 60px / Bold</div>
+    <div style="font-size:60px; font-weight:700;">Landscape Decision Theatre</div>
+  </div>
+  <div class="type-sample">
+    <div class="size">5xl - 48px / Bold</div>
+    <div style="font-size:48px; font-weight:700;">Heading Large</div>
+  </div>
+  <div class="type-sample">
+    <div class="size">4xl - 36px / Bold</div>
+    <div style="font-size:36px; font-weight:700;">Heading Medium</div>
+  </div>
+  <div class="type-sample">
+    <div class="size">3xl - 30px / Semibold</div>
+    <div style="font-size:30px; font-weight:600;">Section Title</div>
+  </div>
+  <div class="type-sample">
+    <div class="size">2xl - 24px / Semibold</div>
+    <div style="font-size:24px; font-weight:600;">Subsection Title</div>
+  </div>
+  <div class="type-sample">
+    <div class="size">xl - 20px / Medium</div>
+    <div style="font-size:20px; font-weight:500;">Card Title</div>
+  </div>
+  <div class="type-sample">
+    <div class="size">lg - 18px / Normal</div>
+    <div style="font-size:18px; font-weight:400;">Large Body Text</div>
+  </div>
+  <div class="type-sample">
+    <div class="size">md - 16px / Normal (Default)</div>
+    <div style="font-size:16px; font-weight:400;">Default body text for paragraphs and UI elements.</div>
+  </div>
+  <div class="type-sample">
+    <div class="size">sm - 14px / Normal</div>
+    <div style="font-size:14px; font-weight:400;">Small text, labels, captions</div>
+  </div>
+  <div class="type-sample">
+    <div class="size">xs - 12px / Normal</div>
+    <div style="font-size:12px; font-weight:400;">Extra small text, badges, metadata</div>
+  </div>
+</section>
+
+<!-- SPACING -->
+<section class="section">
+  <h2>Spacing Scale</h2>
+  <div class="spacing-grid">
+    <div><div class="spacing-box" style="width:4px;height:4px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">1 (4px)</div></div>
+    <div><div class="spacing-box" style="width:8px;height:8px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">2 (8px)</div></div>
+    <div><div class="spacing-box" style="width:12px;height:12px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">3 (12px)</div></div>
+    <div><div class="spacing-box" style="width:16px;height:16px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">4 (16px)</div></div>
+    <div><div class="spacing-box" style="width:20px;height:20px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">5 (20px)</div></div>
+    <div><div class="spacing-box" style="width:24px;height:24px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">6 (24px)</div></div>
+    <div><div class="spacing-box" style="width:32px;height:32px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">8 (32px)</div></div>
+    <div><div class="spacing-box" style="width:40px;height:40px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">10 (40px)</div></div>
+    <div><div class="spacing-box" style="width:48px;height:48px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">12 (48px)</div></div>
+    <div><div class="spacing-box" style="width:64px;height:64px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">16 (64px)</div></div>
+  </div>
+</section>
+
+<!-- SHADOWS -->
+<section class="section">
+  <h2>Shadows</h2>
+  <div>
+    <div class="shadow-sample" style="box-shadow:0 1px 2px 0 rgba(0, 0, 0, 0.05);"><span class="name">sm</span></div>
+    <div class="shadow-sample" style="box-shadow:0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);"><span class="name">base</span></div>
+    <div class="shadow-sample" style="box-shadow:0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);"><span class="name">md</span></div>
+    <div class="shadow-sample" style="box-shadow:0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);"><span class="name">lg</span></div>
+    <div class="shadow-sample" style="box-shadow:0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);"><span class="name">xl</span></div>
+    <div class="shadow-sample" style="box-shadow:0 25px 50px -12px rgba(0, 0, 0, 0.25);"><span class="name">2xl</span></div>
+  </div>
+  <h3>Glow Effects</h3>
+  <div>
+    <div class="shadow-sample" style="box-shadow:0 10px 30px -10px rgba(0, 255, 255, 0.5);"><span class="name">Cyan Glow</span></div>
+    <div class="shadow-sample" style="box-shadow:0 10px 30px -10px rgba(43, 176, 237, 0.5);"><span class="name">Brand Glow</span></div>
+  </div>
+</section>
+
+<!-- BORDER RADIUS -->
+<section class="section">
+  <h2>Border Radius</h2>
+  <div style="display:flex; gap:24px; flex-wrap:wrap;">
+    <div style="text-align:center;"><div style="width:60px;height:60px;background:#4299e1;border-radius:0;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">none (0)</div></div>
+    <div style="text-align:center;"><div style="width:60px;height:60px;background:#4299e1;border-radius:2px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">sm (2px)</div></div>
+    <div style="text-align:center;"><div style="width:60px;height:60px;background:#4299e1;border-radius:4px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">base (4px)</div></div>
+    <div style="text-align:center;"><div style="width:60px;height:60px;background:#4299e1;border-radius:6px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">md (6px)</div></div>
+    <div style="text-align:center;"><div style="width:60px;height:60px;background:#4299e1;border-radius:8px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">lg (8px)</div></div>
+    <div style="text-align:center;"><div style="width:60px;height:60px;background:#4299e1;border-radius:12px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">xl (12px)</div></div>
+    <div style="text-align:center;"><div style="width:60px;height:60px;background:#4299e1;border-radius:16px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">2xl (16px)</div></div>
+    <div style="text-align:center;"><div style="width:60px;height:60px;background:#4299e1;border-radius:9999px;"></div><div style="font-size:10px;color:#718096;margin-top:4px;">full</div></div>
+  </div>
+</section>
+
+<!-- BUTTONS -->
+<section class="section">
+  <h2>Button Styles</h2>
+  <div>
+    <button class="button-sample" style="background:#2bb0ed; color:#fff;">Primary (Brand)</button>
+    <button class="button-sample" style="background:#ff9800; color:#fff;">Accent (Orange)</button>
+    <button class="button-sample" style="background:#4caf50; color:#fff;">Success (Green)</button>
+    <button class="button-sample" style="background:transparent; color:#2bb0ed; border:1px solid #2bb0ed;">Outline</button>
+    <button class="button-sample" style="background:rgba(43,176,237,0.1); color:#2bb0ed;">Ghost</button>
+  </div>
+</section>
+
+<!-- COMPONENT DIMENSIONS -->
+<section class="section">
+  <h2>Component Dimensions</h2>
+  <table>
+    <tr><th>Component</th><th>Property</th><th>Value</th></tr>
+    <tr><td>Header</td><td>Height</td><td>56px</td></tr>
+    <tr><td>Header</td><td>Padding</td><td>16px horizontal</td></tr>
+    <tr><td>Side Panel</td><td>Width (md)</td><td>400px</td></tr>
+    <tr><td>Side Panel</td><td>Width (lg)</td><td>440px</td></tr>
+    <tr><td>Card</td><td>Border Radius</td><td>12px</td></tr>
+    <tr><td>Card</td><td>Padding</td><td>16px</td></tr>
+    <tr><td>Button (sm)</td><td>Height</td><td>32px</td></tr>
+    <tr><td>Button (md)</td><td>Height</td><td>40px</td></tr>
+    <tr><td>Button (lg)</td><td>Height</td><td>48px</td></tr>
+  </table>
+</section>
+
+<!-- ICONS -->
+<section class="section">
+  <h2>Icon Library</h2>
+  <p>The app uses <strong>React Icons (Feather)</strong> - <code>react-icons/fi</code></p>
+  <p>Common icons: FiHome, FiMapPin, FiMap, FiLayers, FiHelpCircle, FiCopy, FiTrash2, FiEdit3, FiUpload, FiPlus, FiCheck, FiX, FiChevronLeft, FiChevronRight</p>
+</section>
+
+<footer style="margin-top:60px; padding-top:24px; border-top:1px solid #2d3748; color:#718096; font-size:12px;">
+  Generated from Decision Theatre codebase | Use <code>design-tokens.json</code> for Figma Tokens plugin import
+</footer>
+
+</body>
+</html>

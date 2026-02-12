@@ -1,0 +1,195 @@
+{
+  "$schema": "https://design-tokens.github.io/design-tokens/schema.json",
+  "name": "Landscape Decision Theatre Design System",
+  "version": "1.0.0",
+
+  "colors": {
+    "brand": {
+      "description": "Primary brand color (Cyan Blue)",
+      "50": { "value": "#e3f8ff", "type": "color" },
+      "100": { "value": "#b3ecff", "type": "color" },
+      "200": { "value": "#81defd", "type": "color" },
+      "300": { "value": "#5ed0fa", "type": "color" },
+      "400": { "value": "#40c3f7", "type": "color" },
+      "500": { "value": "#2bb0ed", "type": "color", "description": "Primary brand color" },
+      "600": { "value": "#1992d4", "type": "color" },
+      "700": { "value": "#127fbf", "type": "color" },
+      "800": { "value": "#0b69a3", "type": "color" },
+      "900": { "value": "#035388", "type": "color" }
+    },
+    "accent": {
+      "description": "Accent color (Orange)",
+      "50": { "value": "#fff3e0", "type": "color" },
+      "100": { "value": "#ffe0b2", "type": "color" },
+      "200": { "value": "#ffcc80", "type": "color" },
+      "300": { "value": "#ffb74d", "type": "color" },
+      "400": { "value": "#ffa726", "type": "color" },
+      "500": { "value": "#ff9800", "type": "color", "description": "Primary accent color" },
+      "600": { "value": "#fb8c00", "type": "color" },
+      "700": { "value": "#f57c00", "type": "color" },
+      "800": { "value": "#ef6c00", "type": "color" },
+      "900": { "value": "#e65100", "type": "color" }
+    },
+    "scenarios": {
+      "description": "Colors for different scenario types",
+      "reference": { "value": "#e65100", "type": "color", "description": "Reference scenario (Orange)" },
+      "current": { "value": "#2bb0ed", "type": "color", "description": "Current scenario (Blue)" },
+      "future": { "value": "#4caf50", "type": "color", "description": "Future scenario (Green)" }
+    },
+    "siteCreation": {
+      "description": "Colors for site creation UI elements",
+      "primary": { "value": "#00FFFF", "type": "color", "description": "Cyan - primary boundary color" },
+      "secondary": { "value": "#FF00FF", "type": "color", "description": "Magenta - secondary highlights" },
+      "accent": { "value": "#FFFF00", "type": "color", "description": "Yellow - accent elements" },
+      "glow": { "value": "#00FF88", "type": "color", "description": "Electric green - glow effects" }
+    },
+    "prismColorScale": {
+      "description": "PRISM 8-color spectrum for choropleth maps",
+      "0": { "value": "#6a0dad", "type": "color", "description": "Violet (0%)" },
+      "1": { "value": "#4b0082", "type": "color", "description": "Indigo (14.3%)" },
+      "2": { "value": "#0074d9", "type": "color", "description": "Blue (28.6%)" },
+      "3": { "value": "#00bcd4", "type": "color", "description": "Cyan (42.9%)" },
+      "4": { "value": "#2ecc40", "type": "color", "description": "Green (57.1%)" },
+      "5": { "value": "#ffdc00", "type": "color", "description": "Yellow (71.4%)" },
+      "6": { "value": "#ff851b", "type": "color", "description": "Orange (85.7%)" },
+      "7": { "value": "#e8003f", "type": "color", "description": "Red (100%)" }
+    },
+    "chart": {
+      "description": "Chart series colors",
+      "series1": { "value": "#e65100", "type": "color" },
+      "series2": { "value": "#2bb0ed", "type": "color" },
+      "series3": { "value": "#6b7280", "type": "color" },
+      "background": { "value": "#1a202c", "type": "color" },
+      "grid": { "value": "#2d3748", "type": "color" },
+      "gridLight": { "value": "#4a5568", "type": "color" },
+      "text": { "value": "#718096", "type": "color" },
+      "textLight": { "value": "#a0aec0", "type": "color" }
+    },
+    "gray": {
+      "description": "Neutral grays (Chakra UI)",
+      "50": { "value": "#F7FAFC", "type": "color" },
+      "100": { "value": "#EDF2F7", "type": "color" },
+      "200": { "value": "#E2E8F0", "type": "color" },
+      "300": { "value": "#CBD5E0", "type": "color" },
+      "400": { "value": "#A0AEC0", "type": "color" },
+      "500": { "value": "#718096", "type": "color" },
+      "600": { "value": "#4A5568", "type": "color" },
+      "700": { "value": "#2D3748", "type": "color" },
+      "800": { "value": "#1A202C", "type": "color" },
+      "900": { "value": "#171923", "type": "color" }
+    },
+    "semantic": {
+      "success": { "value": "#48BB78", "type": "color" },
+      "error": { "value": "#F56565", "type": "color" },
+      "warning": { "value": "#ED8936", "type": "color" },
+      "info": { "value": "#4299E1", "type": "color" }
+    }
+  },
+
+  "typography": {
+    "fontFamily": {
+      "heading": { "value": "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif", "type": "fontFamily" },
+      "body": { "value": "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif", "type": "fontFamily" }
+    },
+    "fontSize": {
+      "xs": { "value": "12px", "type": "dimension" },
+      "sm": { "value": "14px", "type": "dimension" },
+      "md": { "value": "16px", "type": "dimension" },
+      "lg": { "value": "18px", "type": "dimension" },
+      "xl": { "value": "20px", "type": "dimension" },
+      "2xl": { "value": "24px", "type": "dimension" },
+      "3xl": { "value": "30px", "type": "dimension" },
+      "4xl": { "value": "36px", "type": "dimension" },
+      "5xl": { "value": "48px", "type": "dimension" },
+      "6xl": { "value": "60px", "type": "dimension" }
+    },
+    "fontWeight": {
+      "normal": { "value": "400", "type": "fontWeight" },
+      "medium": { "value": "500", "type": "fontWeight" },
+      "semibold": { "value": "600", "type": "fontWeight" },
+      "bold": { "value": "700", "type": "fontWeight" }
+    },
+    "lineHeight": {
+      "normal": { "value": "normal", "type": "lineHeight" },
+      "none": { "value": "1", "type": "lineHeight" },
+      "shorter": { "value": "1.25", "type": "lineHeight" },
+      "short": { "value": "1.375", "type": "lineHeight" },
+      "base": { "value": "1.5", "type": "lineHeight" },
+      "tall": { "value": "1.625", "type": "lineHeight" },
+      "taller": { "value": "2", "type": "lineHeight" }
+    }
+  },
+
+  "spacing": {
+    "0": { "value": "0", "type": "dimension" },
+    "1": { "value": "4px", "type": "dimension" },
+    "2": { "value": "8px", "type": "dimension" },
+    "3": { "value": "12px", "type": "dimension" },
+    "4": { "value": "16px", "type": "dimension" },
+    "5": { "value": "20px", "type": "dimension" },
+    "6": { "value": "24px", "type": "dimension" },
+    "8": { "value": "32px", "type": "dimension" },
+    "10": { "value": "40px", "type": "dimension" },
+    "12": { "value": "48px", "type": "dimension" },
+    "16": { "value": "64px", "type": "dimension" },
+    "20": { "value": "80px", "type": "dimension" },
+    "24": { "value": "96px", "type": "dimension" }
+  },
+
+  "borderRadius": {
+    "none": { "value": "0", "type": "dimension" },
+    "sm": { "value": "2px", "type": "dimension" },
+    "base": { "value": "4px", "type": "dimension" },
+    "md": { "value": "6px", "type": "dimension" },
+    "lg": { "value": "8px", "type": "dimension" },
+    "xl": { "value": "12px", "type": "dimension" },
+    "2xl": { "value": "16px", "type": "dimension" },
+    "3xl": { "value": "24px", "type": "dimension" },
+    "full": { "value": "9999px", "type": "dimension" }
+  },
+
+  "shadows": {
+    "sm": { "value": "0 1px 2px 0 rgba(0, 0, 0, 0.05)", "type": "boxShadow" },
+    "base": { "value": "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)", "type": "boxShadow" },
+    "md": { "value": "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)", "type": "boxShadow" },
+    "lg": { "value": "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)", "type": "boxShadow" },
+    "xl": { "value": "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)", "type": "boxShadow" },
+    "2xl": { "value": "0 25px 50px -12px rgba(0, 0, 0, 0.25)", "type": "boxShadow" },
+    "glowCyan": { "value": "0 10px 30px -10px rgba(0, 255, 255, 0.5)", "type": "boxShadow" },
+    "glowBrand": { "value": "0 10px 30px -10px rgba(43, 176, 237, 0.5)", "type": "boxShadow" },
+    "panel": { "value": "-4px 0 24px rgba(0, 0, 0, 0.15)", "type": "boxShadow" }
+  },
+
+  "gradients": {
+    "brandHeader": { "value": "linear-gradient(to right, #2bb0ed, #ff9800)", "type": "gradient", "description": "Header title gradient (brand to accent)" },
+    "darkOverlay": { "value": "linear-gradient(180deg, rgba(17, 24, 39, 0.95) 0%, rgba(17, 24, 39, 0.85) 100%)", "type": "gradient" },
+    "siteCreationBg": { "value": "linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #0d0d1f 100%)", "type": "gradient" },
+    "cardHighlight": { "value": "linear-gradient(135deg, rgba(0, 255, 255, 0.3) 0%, rgba(128, 0, 255, 0.3) 100%)", "type": "gradient" },
+    "buttonPrimary": { "value": "linear-gradient(135deg, #3182ce 0%, #63b3ed 100%)", "type": "gradient" }
+  },
+
+  "components": {
+    "button": {
+      "defaultColorScheme": "brand",
+      "sizes": {
+        "sm": { "height": "32px", "fontSize": "14px", "padding": "0 12px" },
+        "md": { "height": "40px", "fontSize": "16px", "padding": "0 16px" },
+        "lg": { "height": "48px", "fontSize": "18px", "padding": "0 24px" }
+      }
+    },
+    "header": {
+      "height": { "value": "56px", "type": "dimension" },
+      "padding": { "value": "16px", "type": "dimension" }
+    },
+    "sidePanel": {
+      "width": {
+        "md": { "value": "400px", "type": "dimension" },
+        "lg": { "value": "440px", "type": "dimension" }
+      }
+    },
+    "card": {
+      "borderRadius": { "value": "12px", "type": "dimension" },
+      "padding": { "value": "16px", "type": "dimension" }
+    }
+  }
+}

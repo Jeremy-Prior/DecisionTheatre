@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// SiteCreationMethod represents how a site was created
+// SiteCreationMethod represents how a site boundary was created
 type SiteCreationMethod string
 
 const (
@@ -23,19 +23,33 @@ const (
 	MethodCatchments SiteCreationMethod = "catchments"
 )
 
-// Site represents a geographical area that can be used in projects
+// PaneState represents the state of a single comparison pane
+type PaneState struct {
+	LeftScenario  string `json:"leftScenario"`
+	RightScenario string `json:"rightScenario"`
+	Attribute     string `json:"attribute"`
+}
+
+// Site represents a saved site with its boundary and state
 type Site struct {
-	ID             string             `json:"id"`
-	Name           string             `json:"name"`
-	Description    string             `json:"description"`
-	Thumbnail      *string            `json:"thumbnail"`
-	Geometry       json.RawMessage    `json:"geometry"`       // GeoJSON geometry
-	BoundingBox    *BoundingBox       `json:"boundingBox"`    // Pre-computed bbox for quick lookups
-	Area           float64            `json:"area"`           // Area in square kilometers
-	CreationMethod SiteCreationMethod `json:"creationMethod"` // How the site was created
-	CatchmentIDs   []string           `json:"catchmentIds"`   // If created from catchments, store their IDs
-	CreatedAt      string             `json:"createdAt"`
-	UpdatedAt      string             `json:"updatedAt"`
+	ID          string  `json:"id"`
+	Title       string  `json:"title"`
+	Description string  `json:"description"`
+	Thumbnail   *string `json:"thumbnail"`
+	CreatedAt   string  `json:"createdAt"`
+	UpdatedAt   string  `json:"updatedAt"`
+
+	// Map state
+	PaneStates  []*PaneState `json:"paneStates,omitempty"`
+	LayoutMode  string       `json:"layoutMode,omitempty"`
+	FocusedPane int          `json:"focusedPane,omitempty"`
+
+	// Site boundary (geometry)
+	Geometry       json.RawMessage    `json:"geometry,omitempty"`  // GeoJSON geometry
+	BoundingBox    *BoundingBox       `json:"boundingBox"`         // Pre-computed bbox for quick lookups
+	Area           float64            `json:"area"`                // Area in square kilometers
+	CreationMethod SiteCreationMethod `json:"creationMethod"`      // How the boundary was created
+	CatchmentIDs   []string           `json:"catchmentIds"`        // If created from catchments, store their IDs
 }
 
 // BoundingBox represents a geographic bounding box
@@ -113,6 +127,19 @@ func (s *Store) Create(site *Site) (*Site, error) {
 	site.CreatedAt = now
 	site.UpdatedAt = now
 
+	// Set defaults for pane states if not provided
+	if site.PaneStates == nil {
+		site.PaneStates = []*PaneState{
+			{LeftScenario: "reference", RightScenario: "current", Attribute: ""},
+			{LeftScenario: "current", RightScenario: "future", Attribute: ""},
+			{LeftScenario: "reference", RightScenario: "future", Attribute: ""},
+			{LeftScenario: "reference", RightScenario: "current", Attribute: ""},
+		}
+	}
+	if site.LayoutMode == "" {
+		site.LayoutMode = "single"
+	}
+
 	// Compute bounding box if geometry is provided and bbox is not
 	if site.BoundingBox == nil && len(site.Geometry) > 0 {
 		bbox, err := computeBoundingBox(site.Geometry)
@@ -146,8 +173,8 @@ func (s *Store) Update(id string, updates *Site) (*Site, error) {
 	}
 
 	// Apply updates
-	if updates.Name != "" {
-		site.Name = updates.Name
+	if updates.Title != "" {
+		site.Title = updates.Title
 	}
 	if updates.Description != "" {
 		site.Description = updates.Description
@@ -175,6 +202,15 @@ func (s *Store) Update(id string, updates *Site) (*Site, error) {
 	if updates.Area > 0 {
 		site.Area = updates.Area
 	}
+
+	// Map state updates
+	if updates.PaneStates != nil {
+		site.PaneStates = updates.PaneStates
+	}
+	if updates.LayoutMode != "" {
+		site.LayoutMode = updates.LayoutMode
+	}
+	site.FocusedPane = updates.FocusedPane
 
 	site.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 

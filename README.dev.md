@@ -109,7 +109,7 @@ Build the scenario datapack from catchment geometries and CSV data:
 # - reference.csv (reference scenario metrics)
 # - metadata.csv (optional column descriptions)
 
-bash scripts/build_datapack.sh ./data
+make geopackage
 ```
 
 This creates `datapack.gpkg` with scenario tables, domain min/max for color scaling, and precomputed GeoJSON for fast API serving.

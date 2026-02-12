@@ -31,7 +31,8 @@ GOLINT := golangci-lint
 .PHONY: fmt lint check deps
 .PHONY: docs docs-serve
 .PHONY: packages packages-linux packages-windows packages-darwin
-.PHONY: csv2parquet datapack list-datapack
+.PHONY: csv2parquet geopackage datapack list-datapack
+.PHONY: design-export design-import design-preview
 .PHONY: help info
 
 all: test build
@@ -160,9 +161,14 @@ packages-darwin: build-frontend build-docs
 csv2parquet:
 	python3 scripts/csv2parquet.py --data-dir ./data
 
-# Build data pack: converts CSVs to Parquet, bundles with mbtiles into a zip
+# Build datapack.gpkg from CSVs and catchment geometries
+# Creates scenario tables, domain min/max tables, spatial indexes
+geopackage:
+	./scripts/build-geopackage.sh ./data
+
+# Package data files into distributable .zip (parquet + mbtiles)
 datapack:
-	./scripts/build-datapack.sh $(VERSION)
+	./scripts/package-data.sh $(VERSION)
 
 # List contents of the most recently built data pack
 list-datapack:
@@ -186,6 +192,37 @@ docs-requirements:
 
 docs-requirements-serve:
 	cd requirements && mkdocs serve
+
+# ============================
+# Design System
+# ============================
+
+# Export current theme to design tokens JSON for Figma
+design-export:
+	@echo "Exporting design tokens for Figma..."
+	@echo "Files for your designer:"
+	@echo "  - design-tokens.json  (import into Figma Tokens Studio)"
+	@echo "  - design-system.html  (visual reference)"
+	@echo ""
+	@if [ -f design-tokens.json ]; then \
+		echo "design-tokens.json exists ($(shell stat -c%s design-tokens.json 2>/dev/null || stat -f%z design-tokens.json) bytes)"; \
+	else \
+		echo "Run the app first to generate design-tokens.json"; \
+	fi
+
+# Import design tokens from Figma and regenerate theme
+# Usage: make design-import [TOKENS=path/to/tokens.json]
+TOKENS ?= design-tokens.json
+design-import:
+	@echo "Importing design tokens from $(TOKENS)..."
+	python3 scripts/import-design-tokens.py --input $(TOKENS)
+	@echo ""
+	@echo "Theme updated! Run 'make build-frontend' to apply."
+
+# Preview design tokens without modifying files
+design-preview:
+	@echo "Preview of design token import (dry run)..."
+	python3 scripts/import-design-tokens.py --input $(TOKENS) --dry-run
 
 # ============================
 # Info
@@ -231,9 +268,18 @@ help:
 	@echo "  packages-linux    Linux .tar.gz, .deb, .rpm"
 	@echo "  packages-windows  Windows .zip (needs mingw-w64)"
 	@echo "  packages-darwin   macOS .tar.gz / .dmg (macOS only)"
-	@echo "  csv2parquet        Convert CSV data files to Parquet"
-	@echo "  datapack          Data pack .zip (parquet + mbtiles)"
+	@echo ""
+	@echo "Data Preparation:"
+	@echo "  geopackage        Build datapack.gpkg from CSVs + catchments"
+	@echo "  csv2parquet       Convert CSV data files to Parquet"
+	@echo "  datapack          Package data into distributable .zip"
 	@echo "  list-datapack     List contents of last built data pack"
+	@echo ""
+	@echo "Design System:"
+	@echo "  design-export     Show files to send to designer (Figma)"
+	@echo "  design-import     Import updated tokens from Figma"
+	@echo "  design-preview    Preview import without changes (dry run)"
+	@echo "                    Use TOKENS=path/to/file.json to specify input"
 	@echo ""
 	@echo "Docs:"
 	@echo "  docs / docs-serve"

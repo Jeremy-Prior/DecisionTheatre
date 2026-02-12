@@ -3,7 +3,7 @@ import { Box, IconButton, Tooltip, Icon, VStack, Button, Flex, Text } from '@cha
 import { FiSliders, FiMap, FiInfo, FiBox } from 'react-icons/fi';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import type { ComparisonState, Scenario, IdentifyResult, MapExtent, MapStatistics, ZoneStats } from '../types';
+import type { ComparisonState, Scenario, IdentifyResult, MapExtent, MapStatistics, ZoneStats, BoundingBox } from '../types';
 import { SCENARIOS } from '../types';
 import { registerMap, unregisterMap } from '../hooks/useMapSync';
 
@@ -14,6 +14,9 @@ interface MapViewProps {
   onIdentify?: (result: IdentifyResult) => void;
   onMapExtentChange?: (extent: MapExtent) => void;
   onStatisticsChange?: (stats: MapStatistics) => void;
+  isPanelOpen?: boolean;
+  siteId?: string | null;
+  siteBounds?: BoundingBox | null;
 }
 
 // Layer IDs for choropleth
@@ -187,7 +190,13 @@ function buildExtrusionExpression(
   ] as maplibregl.ExpressionSpecification;
 }
 
-function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify, onMapExtentChange, onStatisticsChange }: MapViewProps) {
+// Layer IDs for site boundary
+const SITE_BOUNDARY_SOURCE = 'site-boundary-source';
+const SITE_BOUNDARY_GLOW_OUTER = 'site-boundary-glow-outer';
+const SITE_BOUNDARY_GLOW_MIDDLE = 'site-boundary-glow-middle';
+const SITE_BOUNDARY_LINE = 'site-boundary-line';
+
+function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify, onMapExtentChange, onStatisticsChange, isPanelOpen, siteId, siteBounds }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const leftMapRef = useRef<maplibregl.Map | null>(null);
   const rightMapRef = useRef<maplibregl.Map | null>(null);
@@ -834,6 +843,153 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     applyColors();
   }, [comparison, applyColors]);
 
+  // Fetch and display site boundary when siteId changes
+  useEffect(() => {
+    const leftMap = leftMapRef.current;
+    const rightMap = rightMapRef.current;
+
+    if (!leftMap || !rightMap) return;
+    if (!mapsReady.current.left || !mapsReady.current.right) return;
+
+    // Helper to remove site boundary layers from a map
+    const removeSiteBoundary = (map: maplibregl.Map) => {
+      if (map.getLayer(SITE_BOUNDARY_LINE)) map.removeLayer(SITE_BOUNDARY_LINE);
+      if (map.getLayer(SITE_BOUNDARY_GLOW_MIDDLE)) map.removeLayer(SITE_BOUNDARY_GLOW_MIDDLE);
+      if (map.getLayer(SITE_BOUNDARY_GLOW_OUTER)) map.removeLayer(SITE_BOUNDARY_GLOW_OUTER);
+      if (map.getSource(SITE_BOUNDARY_SOURCE)) map.removeSource(SITE_BOUNDARY_SOURCE);
+    };
+
+    // Helper to add glowing neon boundary layers
+    const addSiteBoundary = (map: maplibregl.Map, geometry: GeoJSON.Geometry) => {
+      removeSiteBoundary(map);
+
+      // Add GeoJSON source
+      map.addSource(SITE_BOUNDARY_SOURCE, {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          properties: {},
+          geometry,
+        },
+      });
+
+      // Outer glow layer (wide, transparent cyan)
+      map.addLayer({
+        id: SITE_BOUNDARY_GLOW_OUTER,
+        type: 'line',
+        source: SITE_BOUNDARY_SOURCE,
+        paint: {
+          'line-color': '#00FFFF',
+          'line-width': 12,
+          'line-opacity': 0.3,
+          'line-blur': 8,
+        },
+      });
+
+      // Middle glow layer (medium, semi-transparent)
+      map.addLayer({
+        id: SITE_BOUNDARY_GLOW_MIDDLE,
+        type: 'line',
+        source: SITE_BOUNDARY_SOURCE,
+        paint: {
+          'line-color': '#00FFFF',
+          'line-width': 6,
+          'line-opacity': 0.6,
+          'line-blur': 3,
+        },
+      });
+
+      // Core line (bright solid line)
+      map.addLayer({
+        id: SITE_BOUNDARY_LINE,
+        type: 'line',
+        source: SITE_BOUNDARY_SOURCE,
+        paint: {
+          'line-color': '#00FF88',
+          'line-width': 3,
+          'line-opacity': 1,
+        },
+      });
+    };
+
+    // If no site, remove boundaries
+    if (!siteId) {
+      removeSiteBoundary(leftMap);
+      removeSiteBoundary(rightMap);
+      return;
+    }
+
+    // Fetch site data and add boundary
+    fetch(`/api/sites/${siteId}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((site) => {
+        if (site?.geometry) {
+          // Wait for maps to be idle before adding layers
+          const addToMaps = () => {
+            addSiteBoundary(leftMap, site.geometry);
+            addSiteBoundary(rightMap, site.geometry);
+          };
+
+          if (leftMap.loaded() && rightMap.loaded()) {
+            addToMaps();
+          } else {
+            // Wait for both maps to be ready
+            const checkAndAdd = () => {
+              if (leftMap.loaded() && rightMap.loaded()) {
+                addToMaps();
+              }
+            };
+            leftMap.once('idle', checkAndAdd);
+            rightMap.once('idle', checkAndAdd);
+          }
+        }
+      })
+      .catch((err) => console.error('Failed to fetch site boundary:', err));
+
+    // Cleanup on unmount or siteId change
+    return () => {
+      if (leftMapRef.current) removeSiteBoundary(leftMapRef.current);
+      if (rightMapRef.current) removeSiteBoundary(rightMapRef.current);
+    };
+  }, [siteId]);
+
+  // Zoom to site bounds when siteBounds changes (with 10% padding)
+  useEffect(() => {
+    if (!siteBounds) return;
+
+    const zoomToBounds = () => {
+      const leftMap = leftMapRef.current;
+      if (!leftMap) return;
+
+      // Add 10% padding to bounds
+      const dx = (siteBounds.maxX - siteBounds.minX) * 0.1;
+      const dy = (siteBounds.maxY - siteBounds.minY) * 0.1;
+
+      const paddedBounds: [[number, number], [number, number]] = [
+        [siteBounds.minX - dx, siteBounds.minY - dy],
+        [siteBounds.maxX + dx, siteBounds.maxY + dy],
+      ];
+
+      leftMap.fitBounds(paddedBounds, {
+        padding: 50,
+        duration: 1000,
+        maxZoom: 14,
+      });
+    };
+
+    // If map is ready, zoom immediately; otherwise wait for load event
+    const leftMap = leftMapRef.current;
+    if (leftMap && mapsReady.current.left) {
+      zoomToBounds();
+    } else if (leftMap) {
+      leftMap.once('load', zoomToBounds);
+    } else {
+      // Map not created yet, use a short delay
+      const timer = setTimeout(zoomToBounds, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [siteBounds]);
+
   // Check if panel is unconfigured (no indicator selected)
   const isUnconfigured = !comparison.attribute;
 
@@ -893,21 +1049,24 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
               color="gray.300"
               lineHeight="tall"
             >
-              Select an indicator from the sidebar to visualize catchment data
-              and compare scenarios across Africa's river basins.
+              {isPanelOpen
+                ? 'Select a factor from the panel on the right to visualize catchment data and compare scenarios.'
+                : 'Select an indicator from the sidebar to visualize catchment data and compare scenarios across Africa\'s river basins.'}
             </Text>
 
-            {/* Call to action button */}
-            <Button
-              leftIcon={<FiSliders />}
-              colorScheme="blue"
-              size="lg"
-              onClick={onOpenSettings}
-              _hover={{ transform: 'translateY(-2px)', boxShadow: 'lg' }}
-              transition="all 0.2s"
-            >
-              Open Settings
-            </Button>
+            {/* Call to action button - only show when panel is NOT open */}
+            {!isPanelOpen && (
+              <Button
+                leftIcon={<FiSliders />}
+                colorScheme="blue"
+                size="lg"
+                onClick={onOpenSettings}
+                _hover={{ transform: 'translateY(-2px)', boxShadow: 'lg' }}
+                transition="all 0.2s"
+              >
+                Open Settings
+              </Button>
+            )}
 
             {/* Subtle animated dots */}
             <Flex gap={2} mt={2}>

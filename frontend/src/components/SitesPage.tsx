@@ -21,23 +21,24 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   FiArrowLeft,
   FiCopy,
-  FiFolder,
-  FiFolderPlus,
+  FiEdit2,
+  FiMapPin,
   FiPlus,
   FiTrash2,
 } from 'react-icons/fi';
-import type { AppPage, Project } from '../types';
+import type { AppPage, Site } from '../types';
 
 const MotionBox = motion(Box);
 
-interface ProjectsPageProps {
+interface SitesPageProps {
   onNavigate: (page: AppPage) => void;
-  onOpenProject: (project: Project) => void;
-  onCloneProject: (project: Project) => void;
+  onOpenSite: (site: Site) => void;
+  onCloneSite: (site: Site) => void;
+  onEditSite: (site: Site) => void;
 }
 
-function ProjectsPage({ onNavigate, onOpenProject, onCloneProject }: ProjectsPageProps) {
-  const [projects, setProjects] = useState<Project[]>([]);
+function SitesPage({ onNavigate, onOpenSite, onCloneSite, onEditSite }: SitesPageProps) {
+  const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
@@ -49,52 +50,57 @@ function ProjectsPage({ onNavigate, onOpenProject, onCloneProject }: ProjectsPag
     'linear-gradient(180deg, rgba(17,24,39,0.97) 0%, rgba(17,24,39,0.9) 100%)'
   );
 
-  const fetchProjects = useCallback(async () => {
+  const fetchSites = useCallback(async () => {
     try {
-      const response = await fetch('/api/projects');
+      const response = await fetch('/api/sites');
       if (response.ok) {
         const data = await response.json();
-        setProjects(data || []);
+        setSites(data || []);
       }
     } catch (error) {
-      console.error('Failed to fetch projects:', error);
+      console.error('Failed to fetch sites:', error);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+    fetchSites();
+  }, [fetchSites]);
 
-  const handleDelete = async (project: Project, e: React.MouseEvent) => {
+  const handleDelete = async (site: Site, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm(`Are you sure you want to delete "${project.title}"?`)) return;
+    if (!confirm(`Are you sure you want to delete "${site.title}"?`)) return;
 
     try {
-      const response = await fetch(`/api/projects/${project.id}`, {
+      const response = await fetch(`/api/sites/${site.id}`, {
         method: 'DELETE',
       });
       if (response.ok) {
-        setProjects((prev) => prev.filter((p) => p.id !== project.id));
+        setSites((prev) => prev.filter((s) => s.id !== site.id));
         toast({
-          title: 'Project deleted',
+          title: 'Site deleted',
           status: 'success',
           duration: 3000,
         });
       }
     } catch (error) {
       toast({
-        title: 'Failed to delete project',
+        title: 'Failed to delete site',
         status: 'error',
         duration: 3000,
       });
     }
   };
 
-  const handleClone = (project: Project, e: React.MouseEvent) => {
+  const handleClone = (site: Site, e: React.MouseEvent) => {
     e.stopPropagation();
-    onCloneProject(project);
+    onCloneSite(site);
+  };
+
+  const handleEdit = (site: Site, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEditSite(site);
   };
 
   return (
@@ -159,14 +165,14 @@ function ProjectsPage({ onNavigate, onOpenProject, onCloneProject }: ProjectsPag
               color="white"
               mb={4}
             >
-              <Icon as={FiFolder} mr={4} verticalAlign="middle" />
+              <Icon as={FiMapPin} mr={4} verticalAlign="middle" />
               Your{' '}
-              <Text as="span" bgGradient="linear(to-r, brand.300, accent.300)" bgClip="text">
-                Projects
+              <Text as="span" bgGradient="linear(to-r, cyan.300, purple.400)" bgClip="text">
+                Sites
               </Text>
             </Heading>
             <Text fontSize="lg" color="whiteAlpha.800">
-              Open an existing project or create a new one
+              Open an existing site or create a new one
             </Text>
           </MotionBox>
 
@@ -179,22 +185,24 @@ function ProjectsPage({ onNavigate, onOpenProject, onCloneProject }: ProjectsPag
             >
               <Button
                 size="lg"
-                colorScheme="brand"
-                leftIcon={<FiFolderPlus />}
-                onClick={() => onNavigate('create')}
+                bgGradient="linear(to-r, cyan.400, purple.500)"
+                color="white"
+                leftIcon={<FiPlus />}
+                onClick={() => onNavigate('create-site')}
                 _hover={{
                   transform: 'translateY(-2px)',
-                  boxShadow: '0 10px 30px -10px rgba(43, 176, 237, 0.5)',
+                  boxShadow: '0 10px 30px -10px rgba(0, 255, 255, 0.5)',
+                  bgGradient: 'linear(to-r, cyan.300, purple.400)',
                 }}
                 transition="all 0.2s"
                 px={8}
               >
-                Create New Project
+                Create New Site
               </Button>
             </MotionBox>
           </Flex>
 
-          {/* Projects grid */}
+          {/* Sites grid */}
           {loading ? (
             <Grid
               templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }}
@@ -204,7 +212,7 @@ function ProjectsPage({ onNavigate, onOpenProject, onCloneProject }: ProjectsPag
                 <Skeleton key={i} height="280px" borderRadius="xl" />
               ))}
             </Grid>
-          ) : projects.length === 0 ? (
+          ) : sites.length === 0 ? (
             <MotionBox
               textAlign="center"
               py={16}
@@ -222,19 +230,23 @@ function ProjectsPage({ onNavigate, onOpenProject, onCloneProject }: ProjectsPag
                 maxW="500px"
                 mx="auto"
               >
-                <Icon as={FiFolder} boxSize={16} color="whiteAlpha.400" mb={6} />
+                <Icon as={FiMapPin} boxSize={16} color="whiteAlpha.400" mb={6} />
                 <Heading size="md" color="white" mb={4}>
-                  No Projects Yet
+                  No Sites Yet
                 </Heading>
                 <Text color="whiteAlpha.700" mb={8}>
-                  Create your first project to start exploring landscape scenarios
+                  Create your first site to start exploring landscape scenarios
                 </Text>
                 <Button
-                  colorScheme="brand"
+                  bgGradient="linear(to-r, cyan.400, purple.500)"
+                  color="white"
                   leftIcon={<FiPlus />}
-                  onClick={() => onNavigate('create')}
+                  onClick={() => onNavigate('create-site')}
+                  _hover={{
+                    bgGradient: 'linear(to-r, cyan.300, purple.400)',
+                  }}
                 >
-                  Create Your First Project
+                  Create Your First Site
                 </Button>
               </Box>
             </MotionBox>
@@ -243,9 +255,9 @@ function ProjectsPage({ onNavigate, onOpenProject, onCloneProject }: ProjectsPag
               templateColumns={{ base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }}
               gap={6}
             >
-              {projects.map((project, index) => (
+              {sites.map((site, index) => (
                 <MotionBox
-                  key={project.id}
+                  key={site.id}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: 0.1 * index }}
@@ -258,7 +270,7 @@ function ProjectsPage({ onNavigate, onOpenProject, onCloneProject }: ProjectsPag
                     border="1px solid"
                     borderColor={borderColor}
                     cursor="pointer"
-                    onClick={() => onOpenProject(project)}
+                    onClick={() => onOpenSite(site)}
                     _hover={{
                       bg: hoverBg,
                       transform: 'translateY(-4px)',
@@ -273,10 +285,10 @@ function ProjectsPage({ onNavigate, onOpenProject, onCloneProject }: ProjectsPag
                       position="relative"
                       bg="gray.800"
                     >
-                      {project.thumbnail ? (
+                      {site.thumbnail ? (
                         <Image
-                          src={project.thumbnail}
-                          alt={project.title}
+                          src={site.thumbnail}
+                          alt={site.title}
                           objectFit="cover"
                           w="100%"
                           h="100%"
@@ -286,9 +298,9 @@ function ProjectsPage({ onNavigate, onOpenProject, onCloneProject }: ProjectsPag
                           align="center"
                           justify="center"
                           h="100%"
-                          bg="linear-gradient(135deg, rgba(43,176,237,0.3) 0%, rgba(255,152,0,0.3) 100%)"
+                          bg="linear-gradient(135deg, rgba(0,255,255,0.3) 0%, rgba(128,0,255,0.3) 100%)"
                         >
-                          <Icon as={FiFolder} boxSize={12} color="whiteAlpha.400" />
+                          <Icon as={FiMapPin} boxSize={12} color="whiteAlpha.400" />
                         </Flex>
                       )}
                       {/* Action buttons overlay */}
@@ -303,28 +315,40 @@ function ProjectsPage({ onNavigate, onOpenProject, onCloneProject }: ProjectsPag
                           'div:hover &': { opacity: 1 },
                         }}
                       >
-                        <Tooltip label="Clone project">
+                        <Tooltip label="Edit site">
                           <IconButton
-                            aria-label="Clone project"
+                            aria-label="Edit site"
+                            icon={<FiEdit2 />}
+                            size="sm"
+                            variant="solid"
+                            bg="blackAlpha.600"
+                            color="white"
+                            _hover={{ bg: 'purple.500' }}
+                            onClick={(e) => handleEdit(site, e)}
+                          />
+                        </Tooltip>
+                        <Tooltip label="Clone site">
+                          <IconButton
+                            aria-label="Clone site"
                             icon={<FiCopy />}
                             size="sm"
                             variant="solid"
                             bg="blackAlpha.600"
                             color="white"
-                            _hover={{ bg: 'brand.500' }}
-                            onClick={(e) => handleClone(project, e)}
+                            _hover={{ bg: 'cyan.500' }}
+                            onClick={(e) => handleClone(site, e)}
                           />
                         </Tooltip>
-                        <Tooltip label="Delete project">
+                        <Tooltip label="Delete site">
                           <IconButton
-                            aria-label="Delete project"
+                            aria-label="Delete site"
                             icon={<FiTrash2 />}
                             size="sm"
                             variant="solid"
                             bg="blackAlpha.600"
                             color="white"
                             _hover={{ bg: 'red.500' }}
-                            onClick={(e) => handleDelete(project, e)}
+                            onClick={(e) => handleDelete(site, e)}
                           />
                         </Tooltip>
                       </HStack>
@@ -333,13 +357,13 @@ function ProjectsPage({ onNavigate, onOpenProject, onCloneProject }: ProjectsPag
                     {/* Content */}
                     <VStack align="start" p={5} spacing={2}>
                       <Heading size="sm" color="white" noOfLines={1}>
-                        {project.title}
+                        {site.title}
                       </Heading>
                       <Text color="whiteAlpha.700" fontSize="sm" noOfLines={2} minH="40px">
-                        {project.description || 'No description'}
+                        {site.description || 'No description'}
                       </Text>
                       <Text color="whiteAlpha.500" fontSize="xs">
-                        Created {new Date(project.createdAt).toLocaleDateString()}
+                        Created {new Date(site.createdAt).toLocaleDateString()}
                       </Text>
                     </VStack>
                   </Box>
@@ -353,4 +377,4 @@ function ProjectsPage({ onNavigate, onOpenProject, onCloneProject }: ProjectsPag
   );
 }
 
-export default ProjectsPage;
+export default SitesPage;

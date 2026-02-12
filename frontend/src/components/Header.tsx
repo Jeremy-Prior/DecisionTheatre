@@ -9,7 +9,7 @@ import {
   useColorModeValue,
   Tooltip,
 } from '@chakra-ui/react';
-import { FiLayers, FiHelpCircle, FiHome, FiFolder, FiMap } from 'react-icons/fi';
+import { FiLayers, FiHelpCircle, FiHome, FiMapPin, FiMap } from 'react-icons/fi';
 import { useServerInfo } from '../hooks/useApi';
 import type { AppPage } from '../types';
 
@@ -18,12 +18,14 @@ interface HeaderProps {
   isDocsOpen: boolean;
   onNavigate?: (page: AppPage) => void;
   currentPage?: AppPage;
+  siteTitle?: string | null;
 }
 
-function Header({ onToggleDocs, isDocsOpen, onNavigate, currentPage }: HeaderProps) {
+function Header({ onToggleDocs, isDocsOpen, onNavigate, currentPage, siteTitle }: HeaderProps) {
   const { info } = useServerInfo();
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const siteTitleColor = useColorModeValue('gray.700', 'gray.200');
 
   return (
     <Flex
@@ -62,36 +64,55 @@ function Header({ onToggleDocs, isDocsOpen, onNavigate, currentPage }: HeaderPro
             v{info.version}
           </Badge>
         )}
+        {/* Site title - show when viewing a site */}
+        {siteTitle && currentPage === 'map' && (
+          <>
+            <Text color="gray.400" fontSize="lg" fontWeight="light" mx={2}>
+              /
+            </Text>
+            <Text
+              fontSize="md"
+              fontWeight="semibold"
+              color={siteTitleColor}
+              maxW="300px"
+              isTruncated
+            >
+              {siteTitle}
+            </Text>
+          </>
+        )}
       </HStack>
 
       <Spacer />
 
       <HStack spacing={2}>
-        {/* Navigation buttons - show on all pages except landing */}
-        {onNavigate && currentPage && currentPage !== 'landing' && (
+        {/* Navigation buttons - always show Sites, show Home on non-landing pages */}
+        {onNavigate && (
           <HStack spacing={1} display={{ base: 'none', md: 'flex' }}>
-            <Tooltip label="Home">
+            {currentPage && currentPage !== 'landing' && (
+              <Tooltip label="Home">
+                <IconButton
+                  aria-label="Go to home"
+                  icon={<FiHome />}
+                  onClick={() => onNavigate('landing')}
+                  variant="ghost"
+                  colorScheme="brand"
+                  size="sm"
+                />
+              </Tooltip>
+            )}
+            <Tooltip label="My Sites">
               <IconButton
-                aria-label="Go to home"
-                icon={<FiHome />}
-                onClick={() => onNavigate('landing')}
-                variant="ghost"
-                colorScheme="brand"
-                size="sm"
-              />
-            </Tooltip>
-            <Tooltip label="Projects">
-              <IconButton
-                aria-label="Go to projects"
-                icon={<FiFolder />}
-                onClick={() => onNavigate('projects')}
-                variant={currentPage === 'projects' ? 'solid' : 'ghost'}
+                aria-label="Go to sites"
+                icon={<FiMapPin />}
+                onClick={() => onNavigate('sites')}
+                variant={currentPage === 'sites' ? 'solid' : 'ghost'}
                 colorScheme="brand"
                 size="sm"
               />
             </Tooltip>
             {currentPage === 'map' && (
-              <Tooltip label="Current project map">
+              <Tooltip label="Current site map">
                 <IconButton
                   aria-label="Map view"
                   icon={<FiMap />}

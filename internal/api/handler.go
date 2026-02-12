@@ -9,19 +9,17 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/kartoza/decision-theatre/internal/config"
 	"github.com/kartoza/decision-theatre/internal/geodata"
-	"github.com/kartoza/decision-theatre/internal/projects"
 	"github.com/kartoza/decision-theatre/internal/sites"
 	"github.com/kartoza/decision-theatre/internal/tiles"
 )
 
 // Handler provides HTTP API endpoints
 type Handler struct {
-	tileStore    *tiles.MBTilesStore
-	geoStore     *geodata.GeoParquetStore
-	gpkgStore    *geodata.GpkgStore
-	projectStore *projects.Store
-	siteStore    *sites.Store
-	cfg          config.Config
+	tileStore *tiles.MBTilesStore
+	geoStore  *geodata.GeoParquetStore
+	gpkgStore *geodata.GpkgStore
+	siteStore *sites.Store
+	cfg       config.Config
 }
 
 // NewHandler creates a new API handler
@@ -29,17 +27,15 @@ func NewHandler(
 	tileStore *tiles.MBTilesStore,
 	geoStore *geodata.GeoParquetStore,
 	gpkgStore *geodata.GpkgStore,
-	projectStore *projects.Store,
 	siteStore *sites.Store,
 	cfg config.Config,
 ) *Handler {
 	return &Handler{
-		tileStore:    tileStore,
-		geoStore:     geoStore,
-		gpkgStore:    gpkgStore,
-		projectStore: projectStore,
-		siteStore:    siteStore,
-		cfg:          cfg,
+		tileStore: tileStore,
+		geoStore:  geoStore,
+		gpkgStore: gpkgStore,
+		siteStore: siteStore,
+		cfg:       cfg,
 	}
 }
 
@@ -63,13 +59,6 @@ func (h *Handler) RegisterRoutes(r *mux.Router) {
 	// Choropleth endpoint - returns GeoJSON filtered by bbox
 	r.HandleFunc("/choropleth", h.handleChoropleth).Methods("GET")
 
-	// Project management
-	r.HandleFunc("/projects", h.handleListProjects).Methods("GET")
-	r.HandleFunc("/projects", h.handleCreateProject).Methods("POST")
-	r.HandleFunc("/projects/{id}", h.handleGetProject).Methods("GET")
-	r.HandleFunc("/projects/{id}", h.handleUpdateProject).Methods("PUT", "PATCH")
-	r.HandleFunc("/projects/{id}", h.handleDeleteProject).Methods("DELETE")
-
 	// Site management
 	r.HandleFunc("/sites", h.handleListSites).Methods("GET")
 	r.HandleFunc("/sites", h.handleCreateSite).Methods("POST")
@@ -79,6 +68,7 @@ func (h *Handler) RegisterRoutes(r *mux.Router) {
 
 	// Catchment selection for site creation
 	r.HandleFunc("/sites/dissolve-catchments", h.handleDissolveCatchments).Methods("POST")
+	r.HandleFunc("/catchments/geometry/{id}", h.handleCatchmentGeometry).Methods("GET")
 }
 
 // respondJSON sends a JSON response
@@ -219,100 +209,6 @@ func (h *Handler) handleCatchmentIdentify(w http.ResponseWriter, r *http.Request
 	}
 
 	respondJSON(w, http.StatusOK, data)
-}
-
-// handleListProjects returns all projects
-func (h *Handler) handleListProjects(w http.ResponseWriter, r *http.Request) {
-	if h.projectStore == nil {
-		respondJSON(w, http.StatusOK, []*projects.Project{})
-		return
-	}
-
-	projectList, err := h.projectStore.List()
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	respondJSON(w, http.StatusOK, projectList)
-}
-
-// handleGetProject returns a single project by ID
-func (h *Handler) handleGetProject(w http.ResponseWriter, r *http.Request) {
-	if h.projectStore == nil {
-		respondError(w, http.StatusNotFound, "project store not initialized")
-		return
-	}
-
-	id := mux.Vars(r)["id"]
-	project, err := h.projectStore.Get(id)
-	if err != nil {
-		respondError(w, http.StatusNotFound, err.Error())
-		return
-	}
-
-	respondJSON(w, http.StatusOK, project)
-}
-
-// handleCreateProject creates a new project
-func (h *Handler) handleCreateProject(w http.ResponseWriter, r *http.Request) {
-	if h.projectStore == nil {
-		respondError(w, http.StatusInternalServerError, "project store not initialized")
-		return
-	}
-
-	var project projects.Project
-	if err := json.NewDecoder(r.Body).Decode(&project); err != nil {
-		respondError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	created, err := h.projectStore.Create(&project)
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	respondJSON(w, http.StatusCreated, created)
-}
-
-// handleUpdateProject updates an existing project
-func (h *Handler) handleUpdateProject(w http.ResponseWriter, r *http.Request) {
-	if h.projectStore == nil {
-		respondError(w, http.StatusInternalServerError, "project store not initialized")
-		return
-	}
-
-	id := mux.Vars(r)["id"]
-	var updates projects.Project
-	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
-		respondError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	updated, err := h.projectStore.Update(id, &updates)
-	if err != nil {
-		respondError(w, http.StatusNotFound, err.Error())
-		return
-	}
-
-	respondJSON(w, http.StatusOK, updated)
-}
-
-// handleDeleteProject deletes a project
-func (h *Handler) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
-	if h.projectStore == nil {
-		respondError(w, http.StatusInternalServerError, "project store not initialized")
-		return
-	}
-
-	id := mux.Vars(r)["id"]
-	if err := h.projectStore.Delete(id); err != nil {
-		respondError(w, http.StatusNotFound, err.Error())
-		return
-	}
-
-	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
 // ChoroplethResponse wraps a FeatureCollection with domain range for consistent color scaling
@@ -599,4 +495,31 @@ func extractBBoxFromGeom(geom map[string]interface{}, bbox *sites.BoundingBox) {
 			}
 		}
 	}
+}
+
+// handleCatchmentGeometry returns the full geometry for a single catchment from the GeoPackage
+func (h *Handler) handleCatchmentGeometry(w http.ResponseWriter, r *http.Request) {
+	if h.gpkgStore == nil {
+		respondError(w, http.StatusServiceUnavailable, "geopackage store not available")
+		return
+	}
+
+	catchmentID := mux.Vars(r)["id"]
+	if catchmentID == "" {
+		respondError(w, http.StatusBadRequest, "catchment ID required")
+		return
+	}
+
+	features, err := h.gpkgStore.GetCatchmentsByIDs([]string{catchmentID})
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if len(features) == 0 {
+		respondError(w, http.StatusNotFound, "catchment not found")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, features[0])
 }

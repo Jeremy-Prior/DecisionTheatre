@@ -17,7 +17,6 @@ import (
 	"github.com/kartoza/decision-theatre/internal/api"
 	"github.com/kartoza/decision-theatre/internal/config"
 	"github.com/kartoza/decision-theatre/internal/geodata"
-	"github.com/kartoza/decision-theatre/internal/projects"
 	"github.com/kartoza/decision-theatre/internal/sites"
 	"github.com/kartoza/decision-theatre/internal/tiles"
 )
@@ -30,14 +29,13 @@ var docsFS embed.FS
 
 // Server holds all the components for the web application
 type Server struct {
-	cfg          config.Config
-	httpServer   *http.Server
-	router       *mux.Router
-	tileStore    *tiles.MBTilesStore
-	geoStore     *geodata.GeoParquetStore
-	gpkgStore    *geodata.GpkgStore
-	projectStore *projects.Store
-	siteStore    *sites.Store
+	cfg        config.Config
+	httpServer *http.Server
+	router     *mux.Router
+	tileStore  *tiles.MBTilesStore
+	geoStore   *geodata.GeoParquetStore
+	gpkgStore  *geodata.GpkgStore
+	siteStore  *sites.Store
 }
 
 // New creates a new Server with all components initialized
@@ -72,14 +70,6 @@ func New(cfg config.Config) (*Server, error) {
 		s.gpkgStore = gpkgStore
 	}
 
-	// Initialize projects store
-	projectStore, err := projects.NewStore(cfg.DataDir)
-	if err != nil {
-		log.Printf("Warning: Projects store not available: %v", err)
-	} else {
-		s.projectStore = projectStore
-	}
-
 	// Initialize sites store
 	siteStore, err := sites.NewStore(cfg.DataDir)
 	if err != nil {
@@ -98,7 +88,7 @@ func New(cfg config.Config) (*Server, error) {
 func (s *Server) setupRoutes() {
 	// API routes
 	apiRouter := s.router.PathPrefix("/api").Subrouter()
-	apiHandler := api.NewHandler(s.tileStore, s.geoStore, s.gpkgStore, s.projectStore, s.siteStore, s.cfg)
+	apiHandler := api.NewHandler(s.tileStore, s.geoStore, s.gpkgStore, s.siteStore, s.cfg)
 	apiHandler.RegisterRoutes(apiRouter)
 
 	// Data pack management routes
@@ -115,7 +105,7 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/data/style.json", s.handleStyleJSON).Methods("GET")
 	s.router.HandleFunc("/data/tiles.json", s.handleTileJSON).Methods("GET")
 
-	// Serve project images from data/images directory
+	// Serve site images from data/images directory
 	imagesDir := filepath.Join(s.cfg.DataDir, "images")
 	s.router.PathPrefix("/data/images/").Handler(
 		http.StripPrefix("/data/images/", http.FileServer(http.Dir(imagesDir))))

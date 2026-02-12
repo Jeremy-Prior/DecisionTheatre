@@ -7,6 +7,8 @@ import {
   FormLabel,
   Heading,
   Icon,
+  IconButton,
+  Image,
   Input,
   SimpleGrid,
   Text,
@@ -22,13 +24,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCallback, useRef, useState } from 'react';
 import {
   FiArrowLeft,
-  FiArrowRight,
+  FiCheck,
   FiUpload,
   FiEdit3,
   FiLayers,
   FiMapPin,
   FiFile,
-  FiFolderPlus,
+  FiImage,
+  FiX,
 } from 'react-icons/fi';
 import type { AppPage, Site, SiteCreationMethod, BoundingBox } from '../types';
 import SiteCreationMap from './SiteCreationMap';
@@ -41,6 +44,7 @@ interface SiteCreationPageProps {
   onNavigate: (page: AppPage) => void;
   onSiteCreated: (site: Site) => void;
   initialExtent?: { center: [number, number]; zoom: number };
+  editSite?: Site | null; // When provided, component enters edit mode
 }
 
 interface CreationMethodOption {
@@ -87,24 +91,108 @@ const creationMethods: CreationMethodOption[] = [
   },
 ];
 
-type Step = 'method' | 'geometry' | 'details' | 'project';
+type Step = 'method' | 'geometry' | 'details';
 
-function SiteCreationPage({ onNavigate, onSiteCreated, initialExtent }: SiteCreationPageProps) {
-  const [step, setStep] = useState<Step>('method');
-  const [selectedMethod, setSelectedMethod] = useState<SiteCreationMethod | null>(null);
-  const [geometry, setGeometry] = useState<GeoJSON.Geometry | null>(null);
-  const [boundingBox, setBoundingBox] = useState<BoundingBox | null>(null);
-  const [selectedCatchmentIds, setSelectedCatchmentIds] = useState<string[]>([]);
-  const [siteName, setSiteName] = useState('');
-  const [siteDescription, setSiteDescription] = useState('');
-  const [createdSite, setCreatedSite] = useState<Site | null>(null);
-  const [projectTitle, setProjectTitle] = useState('');
-  const [projectDescription, setProjectDescription] = useState('');
+function SiteCreationPage({ onNavigate, onSiteCreated, initialExtent, editSite }: SiteCreationPageProps) {
+  const isEditMode = !!editSite;
+
+  // In edit mode, start at details step; otherwise start at method
+  const [step, setStep] = useState<Step>(() => isEditMode ? 'details' : 'method');
+  const [selectedMethod, setSelectedMethod] = useState<SiteCreationMethod | null>(() =>
+    editSite?.creationMethod || null
+  );
+  const [geometry, setGeometry] = useState<GeoJSON.Geometry | null>(() =>
+    editSite?.geometry || null
+  );
+  const [boundingBox, setBoundingBox] = useState<BoundingBox | null>(() =>
+    editSite?.boundingBox || null
+  );
+  const [selectedCatchmentIds, setSelectedCatchmentIds] = useState<string[]>(() =>
+    editSite?.catchmentIds || []
+  );
+  const [siteTitle, setSiteTitle] = useState(() => editSite?.title || '');
+  const [siteDescription, setSiteDescription] = useState(() => editSite?.description || '');
+  const [thumbnail, setThumbnail] = useState<string | null>(() => editSite?.thumbnail || null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
+  const [isDraggingThumbnail, setIsDraggingThumbnail] = useState(false);
   const toast = useToast();
+
+  // Process thumbnail file (shared between drag-drop and file input)
+  const processThumbnailFile = useCallback((file: File) => {
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please select an image file',
+        status: 'warning',
+        duration: 3000,
+      });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: 'File too large',
+        description: 'Please select an image smaller than 5MB',
+        status: 'warning',
+        duration: 3000,
+      });
+      return;
+    }
+
+    // Convert to base64 for storage
+    const reader = new FileReader();
+    reader.onload = () => {
+      setThumbnail(reader.result as string);
+    };
+    reader.onerror = () => {
+      toast({
+        title: 'Failed to read file',
+        description: 'Could not process the image',
+        status: 'error',
+        duration: 3000,
+      });
+    };
+    reader.readAsDataURL(file);
+  }, [toast]);
+
+  // Handle thumbnail file selection from input
+  const handleThumbnailUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    processThumbnailFile(file);
+    // Reset input for re-selection
+    if (thumbnailInputRef.current) thumbnailInputRef.current.value = '';
+  }, [processThumbnailFile]);
+
+  // Handle drag events for thumbnail drop zone
+  const handleThumbnailDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingThumbnail(true);
+  }, []);
+
+  const handleThumbnailDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingThumbnail(false);
+  }, []);
+
+  const handleThumbnailDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingThumbnail(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processThumbnailFile(file);
+    }
+  }, [processThumbnailFile]);
 
   const cardBg = useColorModeValue('whiteAlpha.100', 'whiteAlpha.50');
   const borderColor = useColorModeValue('whiteAlpha.300', 'whiteAlpha.200');
@@ -204,30 +292,36 @@ function SiteCreationPage({ onNavigate, onSiteCreated, initialExtent }: SiteCrea
 
   const handleGeometryComplete = useCallback((
     newGeometry: GeoJSON.Geometry,
-    catchmentIds?: string[]
+    catchmentIds?: string[],
+    mapThumbnail?: string
   ) => {
     setGeometry(newGeometry);
     setBoundingBox(computeBoundingBox(newGeometry));
     if (catchmentIds) {
       setSelectedCatchmentIds(catchmentIds);
     }
+    // Set the map thumbnail as default if no thumbnail is set yet
+    if (mapThumbnail && !thumbnail) {
+      setThumbnail(mapThumbnail);
+    }
     setStep('details');
-  }, []);
+  }, [thumbnail]);
 
   const handleSubmitSite = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!siteName.trim()) {
+    if (!siteTitle.trim()) {
       toast({
-        title: 'Name required',
-        description: 'Please enter a name for your site',
+        title: 'Title required',
+        description: 'Please enter a title for your site',
         status: 'warning',
         duration: 3000,
       });
       return;
     }
 
-    if (!geometry) {
+    // In create mode, geometry is required; in edit mode it's optional (keeps existing)
+    if (!isEditMode && !geometry) {
       toast({
         title: 'Geometry required',
         description: 'Please complete the site boundary',
@@ -240,105 +334,49 @@ function SiteCreationPage({ onNavigate, onSiteCreated, initialExtent }: SiteCrea
     setIsSubmitting(true);
 
     try {
-      const siteData = {
-        name: siteName.trim(),
+      const siteData: Record<string, unknown> = {
+        title: siteTitle.trim(),
         description: siteDescription.trim(),
-        geometry,
-        creationMethod: selectedMethod,
-        catchmentIds: selectedCatchmentIds,
       };
 
-      const response = await fetch('/api/sites', {
-        method: 'POST',
+      // Only include thumbnail if changed (new base64 data URL or null to remove)
+      if (thumbnail !== editSite?.thumbnail) {
+        siteData.thumbnail = thumbnail;
+      }
+
+      // In create mode, always include geometry; in edit mode, only if changed
+      if (!isEditMode) {
+        siteData.geometry = geometry;
+        siteData.creationMethod = selectedMethod;
+        siteData.catchmentIds = selectedCatchmentIds;
+      }
+
+      const url = isEditMode ? `/api/sites/${editSite.id}` : '/api/sites';
+      const method = isEditMode ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(siteData),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create site');
+        throw new Error(isEditMode ? 'Failed to update site' : 'Failed to create site');
       }
 
       const site = await response.json();
-      setCreatedSite(site);
-      // Pre-fill project title based on site name
-      setProjectTitle(`${site.name} Project`);
 
       toast({
-        title: 'Site created!',
-        description: 'Now let\'s create a project',
+        title: isEditMode ? 'Site updated!' : 'Site created!',
+        description: `"${site.title}" ${isEditMode ? 'has been updated' : 'is ready'}`,
         status: 'success',
         duration: 3000,
       });
 
-      setStep('project');
+      onSiteCreated(site);
     } catch (error) {
       toast({
-        title: 'Error creating site',
-        description: error instanceof Error ? error.message : 'Unknown error',
-        status: 'error',
-        duration: 5000,
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleSubmitProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!projectTitle.trim()) {
-      toast({
-        title: 'Title required',
-        description: 'Please enter a title for your project',
-        status: 'warning',
-        duration: 3000,
-      });
-      return;
-    }
-
-    if (!createdSite) {
-      toast({
-        title: 'Site required',
-        description: 'Please create a site first',
-        status: 'warning',
-        duration: 3000,
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const projectData = {
-        title: projectTitle.trim(),
-        description: projectDescription.trim(),
-        siteId: createdSite.id,
-      };
-
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(projectData),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create project');
-      }
-
-      const project = await response.json();
-
-      toast({
-        title: 'Project created!',
-        description: `"${project.title}" is ready`,
-        status: 'success',
-        duration: 3000,
-      });
-
-      // Navigate to the projects page or open the project
-      onSiteCreated(createdSite);
-    } catch (error) {
-      toast({
-        title: 'Error creating project',
+        title: isEditMode ? 'Error updating site' : 'Error creating site',
         description: error instanceof Error ? error.message : 'Unknown error',
         status: 'error',
         duration: 5000,
@@ -349,12 +387,13 @@ function SiteCreationPage({ onNavigate, onSiteCreated, initialExtent }: SiteCrea
   };
 
   const handleBack = useCallback(() => {
-    if (step === 'project') {
-      // Can't go back from project - site is already created
-      // Navigate to explore mode to start fresh
-      onNavigate('explore');
-    } else if (step === 'details') {
-      setStep('geometry');
+    if (step === 'details') {
+      // In edit mode, go back to sites (no geometry step to edit)
+      if (isEditMode) {
+        onNavigate('sites');
+      } else {
+        setStep('geometry');
+      }
     } else if (step === 'geometry') {
       setStep('method');
       setSelectedMethod(null);
@@ -362,11 +401,14 @@ function SiteCreationPage({ onNavigate, onSiteCreated, initialExtent }: SiteCrea
       setBoundingBox(null);
       setSelectedCatchmentIds([]);
     } else {
-      onNavigate('explore');
+      onNavigate('sites');
     }
-  }, [step, onNavigate]);
+  }, [step, onNavigate, isEditMode]);
 
   const getStepTitle = () => {
+    if (isEditMode) {
+      return 'Update site details';
+    }
     switch (step) {
       case 'method':
         return 'Choose Your Method';
@@ -376,8 +418,6 @@ function SiteCreationPage({ onNavigate, onSiteCreated, initialExtent }: SiteCrea
                'Review Your Boundary';
       case 'details':
         return 'Name Your Site';
-      case 'project':
-        return 'Create Your Project';
     }
   };
 
@@ -404,12 +444,19 @@ function SiteCreationPage({ onNavigate, onSiteCreated, initialExtent }: SiteCrea
         zIndex={0}
       />
 
-      {/* Hidden file input */}
+      {/* Hidden file inputs */}
       <input
         ref={fileInputRef}
         type="file"
         accept={selectedMethod === 'shapefile' ? '.zip' : '.geojson,.json'}
         onChange={handleFileUpload}
+        style={{ display: 'none' }}
+      />
+      <input
+        ref={thumbnailInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleThumbnailUpload}
         style={{ display: 'none' }}
       />
 
@@ -482,29 +529,30 @@ function SiteCreationPage({ onNavigate, onSiteCreated, initialExtent }: SiteCrea
               onClick={handleBack}
               _hover={{ bg: 'whiteAlpha.200' }}
             >
-              {step === 'method' ? 'Back to Projects' : 'Back'}
+              {isEditMode || step === 'method' ? 'Back to Sites' : 'Back'}
             </Button>
 
-            {/* Step indicator */}
-            <HStack spacing={2}>
-              {[
-                { id: 'method', label: 'Method' },
-                { id: 'geometry', label: 'Boundary' },
-                { id: 'details', label: 'Site' },
-                { id: 'project', label: 'Project' },
-              ].map((s, i) => (
-                <Badge
-                  key={s.id}
-                  px={3}
-                  py={1}
-                  borderRadius="full"
-                  bg={step === s.id ? 'cyan.500' : 'whiteAlpha.200'}
-                  color={step === s.id ? 'white' : 'whiteAlpha.600'}
-                >
-                  {i + 1}. {s.label}
-                </Badge>
-              ))}
-            </HStack>
+            {/* Step indicator - only show in create mode */}
+            {!isEditMode && (
+              <HStack spacing={2}>
+                {[
+                  { id: 'method', label: 'Method' },
+                  { id: 'geometry', label: 'Boundary' },
+                  { id: 'details', label: 'Details' },
+                ].map((s, i) => (
+                  <Badge
+                    key={s.id}
+                    px={3}
+                    py={1}
+                    borderRadius="full"
+                    bg={step === s.id ? 'cyan.500' : 'whiteAlpha.200'}
+                    color={step === s.id ? 'white' : 'whiteAlpha.600'}
+                  >
+                    {i + 1}. {s.label}
+                  </Badge>
+                ))}
+              </HStack>
+            )}
           </MotionFlex>
 
           {/* Title */}
@@ -521,7 +569,7 @@ function SiteCreationPage({ onNavigate, onSiteCreated, initialExtent }: SiteCrea
               color="white"
               mb={2}
             >
-              Create{' '}
+              {isEditMode ? 'Edit' : 'Create'}{' '}
               <Text
                 as="span"
                 bgGradient="linear(to-r, cyan.300, purple.400)"
@@ -674,14 +722,14 @@ function SiteCreationPage({ onNavigate, onSiteCreated, initialExtent }: SiteCrea
                       </Button>
                     </Flex>
 
-                    {/* Name input */}
+                    {/* Title input */}
                     <FormControl isRequired>
                       <FormLabel color="white" fontSize="lg">
-                        Site Name
+                        Site Title
                       </FormLabel>
                       <Input
-                        value={siteName}
-                        onChange={(e) => setSiteName(e.target.value)}
+                        value={siteTitle}
+                        onChange={(e) => setSiteTitle(e.target.value)}
                         placeholder="e.g., Upper Nile Basin"
                         size="lg"
                         bg={inputBg}
@@ -722,15 +770,135 @@ function SiteCreationPage({ onNavigate, onSiteCreated, initialExtent }: SiteCrea
                       />
                     </FormControl>
 
+                    {/* Thumbnail upload with drag-drop */}
+                    <FormControl>
+                      <FormLabel color="white" fontSize="lg">
+                        Thumbnail
+                      </FormLabel>
+                      {thumbnail ? (
+                        <Box
+                          position="relative"
+                          display="inline-block"
+                          borderRadius="xl"
+                          overflow="hidden"
+                          boxShadow="0 8px 32px rgba(0, 255, 255, 0.2)"
+                        >
+                          <Image
+                            src={thumbnail}
+                            alt="Site thumbnail"
+                            maxH="180px"
+                            objectFit="cover"
+                          />
+                          <Box
+                            position="absolute"
+                            top={0}
+                            left={0}
+                            right={0}
+                            bottom={0}
+                            bg="blackAlpha.400"
+                            opacity={0}
+                            _hover={{ opacity: 1 }}
+                            transition="opacity 0.2s"
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="center"
+                          >
+                            <HStack spacing={2}>
+                              <IconButton
+                                aria-label="Change thumbnail"
+                                icon={<FiImage />}
+                                size="sm"
+                                colorScheme="whiteAlpha"
+                                variant="solid"
+                                onClick={() => thumbnailInputRef.current?.click()}
+                              />
+                              <IconButton
+                                aria-label="Remove thumbnail"
+                                icon={<FiX />}
+                                size="sm"
+                                colorScheme="red"
+                                variant="solid"
+                                onClick={() => setThumbnail(null)}
+                              />
+                            </HStack>
+                          </Box>
+                          <Box
+                            position="absolute"
+                            bottom={0}
+                            left={0}
+                            right={0}
+                            bg="blackAlpha.600"
+                            backdropFilter="blur(8px)"
+                            px={3}
+                            py={1.5}
+                          >
+                            <Text fontSize="xs" color="whiteAlpha.800">
+                              Click to change or remove
+                            </Text>
+                          </Box>
+                        </Box>
+                      ) : (
+                        <Box
+                          onDragOver={handleThumbnailDragOver}
+                          onDragLeave={handleThumbnailDragLeave}
+                          onDrop={handleThumbnailDrop}
+                          onClick={() => thumbnailInputRef.current?.click()}
+                          cursor="pointer"
+                          borderWidth="2px"
+                          borderStyle="dashed"
+                          borderColor={isDraggingThumbnail ? 'cyan.400' : borderColor}
+                          borderRadius="xl"
+                          p={8}
+                          textAlign="center"
+                          bg={isDraggingThumbnail ? 'whiteAlpha.100' : 'transparent'}
+                          transition="all 0.2s"
+                          _hover={{
+                            borderColor: 'cyan.400',
+                            bg: 'whiteAlpha.50',
+                          }}
+                        >
+                          <VStack spacing={3}>
+                            <Box
+                              w="60px"
+                              h="60px"
+                              borderRadius="full"
+                              bg={isDraggingThumbnail ? 'cyan.500' : 'whiteAlpha.200'}
+                              display="flex"
+                              alignItems="center"
+                              justifyContent="center"
+                              transition="all 0.2s"
+                            >
+                              <Icon
+                                as={FiImage}
+                                boxSize={6}
+                                color={isDraggingThumbnail ? 'white' : 'whiteAlpha.600'}
+                              />
+                            </Box>
+                            <VStack spacing={1}>
+                              <Text color="whiteAlpha.800" fontWeight="medium">
+                                {isDraggingThumbnail ? 'Drop image here' : 'Drag & drop an image'}
+                              </Text>
+                              <Text fontSize="sm" color="whiteAlpha.500">
+                                or click to browse
+                              </Text>
+                            </VStack>
+                            <Text fontSize="xs" color="whiteAlpha.400">
+                              PNG, JPG, GIF up to 5MB
+                            </Text>
+                          </VStack>
+                        </Box>
+                      )}
+                    </FormControl>
+
                     {/* Submit button */}
                     <Button
                       type="submit"
                       size="lg"
                       bgGradient="linear(to-r, cyan.400, purple.500)"
                       color="white"
-                      rightIcon={<FiArrowRight />}
+                      leftIcon={<FiCheck />}
                       isLoading={isSubmitting}
-                      loadingText="Creating..."
+                      loadingText={isEditMode ? 'Saving...' : 'Creating...'}
                       _hover={{
                         bgGradient: 'linear(to-r, cyan.300, purple.400)',
                         transform: 'translateY(-2px)',
@@ -738,127 +906,13 @@ function SiteCreationPage({ onNavigate, onSiteCreated, initialExtent }: SiteCrea
                       }}
                       transition="all 0.2s"
                     >
-                      Create Site & Continue
+                      {isEditMode ? 'Save Changes' : 'Create Site'}
                     </Button>
                   </VStack>
                 </Box>
               </MotionBox>
             )}
 
-            {step === 'project' && createdSite && (
-              <MotionBox
-                key="project"
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
-                transition={{ duration: 0.4 }}
-                maxW="600px"
-                mx="auto"
-              >
-                <Box
-                  as="form"
-                  onSubmit={handleSubmitProject}
-                  bg={cardBg}
-                  backdropFilter="blur(20px)"
-                  borderRadius="2xl"
-                  p={{ base: 6, md: 10 }}
-                  border="1px solid"
-                  borderColor={borderColor}
-                >
-                  <VStack spacing={6} align="stretch">
-                    {/* Site info */}
-                    <Flex
-                      p={4}
-                      borderRadius="xl"
-                      bg="rgba(0, 68, 0, 0.3)"
-                      align="center"
-                      justify="space-between"
-                      border="1px solid"
-                      borderColor="green.500"
-                    >
-                      <HStack>
-                        <Icon as={FiMapPin} color="green.400" boxSize={6} />
-                        <VStack align="start" spacing={0}>
-                          <Text color="white" fontWeight="medium">
-                            {createdSite.name}
-                          </Text>
-                          <Text color="green.300" fontSize="sm">
-                            Site created successfully
-                          </Text>
-                        </VStack>
-                      </HStack>
-                    </Flex>
-
-                    {/* Project Title input */}
-                    <FormControl isRequired>
-                      <FormLabel color="white" fontSize="lg">
-                        Project Title
-                      </FormLabel>
-                      <Input
-                        value={projectTitle}
-                        onChange={(e) => setProjectTitle(e.target.value)}
-                        placeholder="e.g., Water Resource Analysis 2024"
-                        size="lg"
-                        bg={inputBg}
-                        border="1px solid"
-                        borderColor={borderColor}
-                        color="white"
-                        _placeholder={{ color: 'whiteAlpha.500' }}
-                        _hover={{ borderColor: 'whiteAlpha.400' }}
-                        _focus={{
-                          borderColor: 'cyan.400',
-                          boxShadow: '0 0 0 1px var(--chakra-colors-cyan-400)',
-                        }}
-                      />
-                    </FormControl>
-
-                    {/* Project Description input */}
-                    <FormControl>
-                      <FormLabel color="white" fontSize="lg">
-                        Project Description
-                      </FormLabel>
-                      <Textarea
-                        value={projectDescription}
-                        onChange={(e) => setProjectDescription(e.target.value)}
-                        placeholder="Optional description of your project..."
-                        size="lg"
-                        bg={inputBg}
-                        border="1px solid"
-                        borderColor={borderColor}
-                        color="white"
-                        _placeholder={{ color: 'whiteAlpha.500' }}
-                        _hover={{ borderColor: 'whiteAlpha.400' }}
-                        _focus={{
-                          borderColor: 'cyan.400',
-                          boxShadow: '0 0 0 1px var(--chakra-colors-cyan-400)',
-                        }}
-                        rows={3}
-                        resize="vertical"
-                      />
-                    </FormControl>
-
-                    {/* Submit button */}
-                    <Button
-                      type="submit"
-                      size="lg"
-                      bgGradient="linear(to-r, green.400, teal.500)"
-                      color="white"
-                      leftIcon={<FiFolderPlus />}
-                      isLoading={isSubmitting}
-                      loadingText="Creating Project..."
-                      _hover={{
-                        bgGradient: 'linear(to-r, green.300, teal.400)',
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 10px 30px -10px rgba(0, 255, 128, 0.5)',
-                      }}
-                      transition="all 0.2s"
-                    >
-                      Create Project
-                    </Button>
-                  </VStack>
-                </Box>
-              </MotionBox>
-            )}
           </AnimatePresence>
         </Container>
       </Box>

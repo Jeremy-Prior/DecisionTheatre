@@ -20,7 +20,7 @@ interface SiteCreationMapProps {
   initialGeometry?: GeoJSON.Geometry | null;
   initialExtent?: { center: [number, number]; zoom: number };
   boundingBox?: BoundingBox | null;
-  onGeometryComplete: (geometry: GeoJSON.Geometry, catchmentIds?: string[]) => void;
+  onGeometryComplete: (geometry: GeoJSON.Geometry, catchmentIds?: string[], thumbnail?: string) => void;
   onCancel: () => void;
 }
 
@@ -69,6 +69,69 @@ function SiteCreationMap({
   const [isAnimating, setIsAnimating] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const toast = useToast();
+
+  // Capture map as thumbnail
+  const captureMapThumbnail = useCallback((): string | undefined => {
+    const map = mapRef.current;
+    if (!map) return undefined;
+
+    try {
+      const canvas = map.getCanvas();
+      // Create a smaller canvas for thumbnail (max 400px wide)
+      const maxWidth = 400;
+      const scale = Math.min(maxWidth / canvas.width, 1);
+      const thumbnailCanvas = document.createElement('canvas');
+      thumbnailCanvas.width = canvas.width * scale;
+      thumbnailCanvas.height = canvas.height * scale;
+      const ctx = thumbnailCanvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(canvas, 0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
+        return thumbnailCanvas.toDataURL('image/jpeg', 0.85);
+      }
+    } catch (error) {
+      console.error('Failed to capture map thumbnail:', error);
+    }
+    return undefined;
+  }, []);
+
+  // Update selected catchments layer (defined early for use in interaction handlers)
+  const updateSelectedCatchmentsLayer = useCallback((map: maplibregl.Map, selected: Map<string, GeoJSON.Feature>) => {
+    const sourceId = 'selected-catchments';
+
+    // Create or update source
+    let source = map.getSource(sourceId) as maplibregl.GeoJSONSource;
+    if (!source) {
+      map.addSource(sourceId, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      // Add fill layer
+      map.addLayer({
+        id: 'selected-fill',
+        type: 'fill',
+        source: sourceId,
+        paint: SELECTED_CATCHMENT_PAINT,
+      });
+
+      // Add line layer
+      map.addLayer({
+        id: 'selected-line',
+        type: 'line',
+        source: sourceId,
+        paint: SELECTED_CATCHMENT_LINE_PAINT,
+      });
+
+      source = map.getSource(sourceId) as maplibregl.GeoJSONSource;
+    }
+
+    source.setData({
+      type: 'FeatureCollection',
+      features: Array.from(selected.values()),
+    });
+
+    setShowConfirm(selected.size > 0);
+  }, []);
 
   // Initialize map
   useEffect(() => {
@@ -163,16 +226,46 @@ function SiteCreationMap({
           const feature = features[0];
           const catchmentId = String(feature.properties?.HYBAS_ID || feature.id);
 
-          setSelectedCatchments(prev => {
-            const next = new Map(prev);
-            if (next.has(catchmentId)) {
+          // Check if already selected - toggle off
+          if (selectedCatchments.has(catchmentId)) {
+            setSelectedCatchments(prev => {
+              const next = new Map(prev);
               next.delete(catchmentId);
+              updateSelectedCatchmentsLayer(map, next);
+              return next;
+            });
+            return;
+          }
+
+          // Fetch full geometry from API for better visual display
+          try {
+            const response = await fetch(`/api/catchments/geometry/${catchmentId}`);
+            if (response.ok) {
+              const fullFeature = await response.json();
+              setSelectedCatchments(prev => {
+                const next = new Map(prev);
+                next.set(catchmentId, fullFeature as GeoJSON.Feature);
+                updateSelectedCatchmentsLayer(map, next);
+                return next;
+              });
             } else {
-              next.set(catchmentId, feature as unknown as GeoJSON.Feature);
+              // Fallback to tile geometry if API fails
+              setSelectedCatchments(prev => {
+                const next = new Map(prev);
+                next.set(catchmentId, feature as unknown as GeoJSON.Feature);
+                updateSelectedCatchmentsLayer(map, next);
+                return next;
+              });
             }
-            updateSelectedCatchmentsLayer(map, next);
-            return next;
-          });
+          } catch {
+            // Fallback to tile geometry on error
+            setSelectedCatchments(prev => {
+              const next = new Map(prev);
+              next.set(catchmentId, feature as unknown as GeoJSON.Feature);
+              updateSelectedCatchmentsLayer(map, next);
+              return next;
+            });
+          }
         }
       };
 
@@ -182,7 +275,7 @@ function SiteCreationMap({
         map.getCanvas().style.cursor = '';
       };
     }
-  }, [mode, isMapReady]);
+  }, [mode, isMapReady, selectedCatchments, updateSelectedCatchmentsLayer]);
 
   // Update drawing preview
   const updateDrawingPreview = useCallback((map: maplibregl.Map, points: [number, number][]) => {
@@ -270,45 +363,6 @@ function SiteCreationMap({
     setShowConfirm(points.length >= 3);
   }, []);
 
-  // Update selected catchments layer
-  const updateSelectedCatchmentsLayer = useCallback((map: maplibregl.Map, selected: Map<string, GeoJSON.Feature>) => {
-    const sourceId = 'selected-catchments';
-
-    // Create or update source
-    let source = map.getSource(sourceId) as maplibregl.GeoJSONSource;
-    if (!source) {
-      map.addSource(sourceId, {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      });
-
-      // Add fill layer
-      map.addLayer({
-        id: 'selected-fill',
-        type: 'fill',
-        source: sourceId,
-        paint: SELECTED_CATCHMENT_PAINT,
-      });
-
-      // Add line layer
-      map.addLayer({
-        id: 'selected-line',
-        type: 'line',
-        source: sourceId,
-        paint: SELECTED_CATCHMENT_LINE_PAINT,
-      });
-
-      source = map.getSource(sourceId) as maplibregl.GeoJSONSource;
-    }
-
-    source.setData({
-      type: 'FeatureCollection',
-      features: Array.from(selected.values()),
-    });
-
-    setShowConfirm(selected.size > 0);
-  }, []);
-
   // Add geometry to map with physics animation
   const addGeometryToMap = useCallback((map: maplibregl.Map, geometry: GeoJSON.Geometry) => {
     const sourceId = 'site-geometry';
@@ -380,9 +434,10 @@ function SiteCreationMap({
 
     setTimeout(() => {
       setIsAnimating(false);
-      onGeometryComplete(polygon);
+      const thumbnail = captureMapThumbnail();
+      onGeometryComplete(polygon, undefined, thumbnail);
     }, 800);
-  }, [drawnPoints, addGeometryToMap, onGeometryComplete]);
+  }, [drawnPoints, addGeometryToMap, onGeometryComplete, captureMapThumbnail]);
 
   // Complete catchment selection
   const handleCompleteCatchments = useCallback(async () => {
@@ -430,7 +485,8 @@ function SiteCreationMap({
 
       setTimeout(() => {
         setIsAnimating(false);
-        onGeometryComplete(result.geometry, catchmentIds);
+        const thumbnail = captureMapThumbnail();
+        onGeometryComplete(result.geometry, catchmentIds, thumbnail);
       }, 1000);
     } catch (error) {
       console.error('Dissolve error:', error);
@@ -442,14 +498,15 @@ function SiteCreationMap({
       });
       setIsAnimating(false);
     }
-  }, [selectedCatchments, addGeometryToMap, onGeometryComplete, toast]);
+  }, [selectedCatchments, addGeometryToMap, onGeometryComplete, toast, captureMapThumbnail]);
 
   // Confirm for uploaded geometry
   const handleConfirmGeometry = useCallback(() => {
     if (initialGeometry) {
-      onGeometryComplete(initialGeometry);
+      const thumbnail = captureMapThumbnail();
+      onGeometryComplete(initialGeometry, undefined, thumbnail);
     }
-  }, [initialGeometry, onGeometryComplete]);
+  }, [initialGeometry, onGeometryComplete, captureMapThumbnail]);
 
   // Reset drawing
   const handleReset = useCallback(() => {

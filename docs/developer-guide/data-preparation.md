@@ -63,7 +63,7 @@ The MapBox GL Style JSON at `resources/mbtiles/style.json` defines how each laye
 
 ## Scenario Data (GeoPackage Datapack)
 
-The application uses a GeoPackage file (`datapack.gpkg`) containing catchment geometries and scenario data. This is built from raw input files using the `scripts/build_datapack.sh` script.
+The application uses a GeoPackage file (`datapack.gpkg`) containing catchment geometries and scenario data. This is built from raw input files using the `scripts/build-geopackage.sh` script.
 
 ### Input Files
 
@@ -81,7 +81,11 @@ All CSVs must have a `catchID` column that cross-references the `HYBAS_ID` in th
 ### Building the Datapack
 
 ```bash
-bash scripts/build_datapack.sh ./data
+# Using Make (recommended)
+make geopackage
+
+# Or directly
+./scripts/build-geopackage.sh ./data
 ```
 
 This script performs the following steps:
