@@ -108,8 +108,8 @@
               );
           };
 
-          # Using vendored dependencies from ./vendor directory
-          vendorHash = null;
+          # Let nix fetch Go dependencies
+          vendorHash = "sha256-VBnEd59jnISjJdfThY0UrLlfciBVc6dcDZ9A+vXMVvc=";
 
           nativeBuildInputs = with pkgs; [
             gcc

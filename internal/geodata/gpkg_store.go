@@ -10,6 +10,7 @@ import (
 	"sync"
 	"unsafe"
 
+	polyclip "github.com/ctessum/polyclip-go"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -434,27 +435,11 @@ func (s *GpkgStore) Close() {
 }
 
 // DissolveCatchments returns a dissolved/unioned geometry from multiple catchments
-// Returns the geometry as GeoJSON and the total area in square kilometers
+// Returns the geometry as GeoJSON (single outer boundary) and the total area in square kilometers
 func (s *GpkgStore) DissolveCatchments(catchmentIDs []string) (json.RawMessage, float64, error) {
 	if len(catchmentIDs) == 0 {
 		return nil, 0, fmt.Errorf("no catchment IDs provided")
 	}
-
-	// For a single catchment, just return its geometry
-	if len(catchmentIDs) == 1 {
-		query := `SELECT geojson FROM catchments_lev12 WHERE HYBAS_ID = ? AND geojson IS NOT NULL`
-		var geojsonStr string
-		err := s.db.QueryRow(query, catchmentIDs[0]).Scan(&geojsonStr)
-		if err != nil {
-			return nil, 0, fmt.Errorf("failed to get catchment geometry: %w", err)
-		}
-		// Estimate area - we'd need to compute this properly in a real implementation
-		return json.RawMessage(geojsonStr), 0, nil
-	}
-
-	// For multiple catchments, we need to union them
-	// Since SQLite doesn't have built-in spatial functions without SpatiaLite,
-	// we'll collect all geometries and union them in Go
 
 	// Build placeholders for query
 	placeholders := make([]string, len(catchmentIDs))
@@ -476,7 +461,8 @@ func (s *GpkgStore) DissolveCatchments(catchmentIDs []string) (json.RawMessage, 
 	}
 	defer rows.Close()
 
-	var polygons [][][][2]float64 // MultiPolygon coordinates (each polygon is [][][2]float64)
+	// Collect all polygons as polyclip.Polygon types
+	var polyPolygons []polyclip.Polygon
 
 	for rows.Next() {
 		var geojsonStr string
@@ -484,51 +470,113 @@ func (s *GpkgStore) DissolveCatchments(catchmentIDs []string) (json.RawMessage, 
 			continue
 		}
 
+		// Parse as GeoJSON geometry
 		var geom map[string]interface{}
 		if err := json.Unmarshal([]byte(geojsonStr), &geom); err != nil {
+			log.Printf("Failed to unmarshal geometry: %v", err)
 			continue
 		}
 
 		geomType, _ := geom["type"].(string)
 		coords := geom["coordinates"]
 
-		// Convert to MultiPolygon format for consistency
+		// Convert to polyclip polygon format
 		switch geomType {
 		case "Polygon":
 			if c, ok := coords.([]interface{}); ok {
-				poly := convertToPolygonCoords(c)
-				polygons = append(polygons, poly)
+				poly := geojsonToPolyclipPolygon(c)
+				if len(poly) > 0 {
+					polyPolygons = append(polyPolygons, poly)
+				}
 			}
 		case "MultiPolygon":
 			if c, ok := coords.([]interface{}); ok {
 				for _, p := range c {
 					if pc, ok := p.([]interface{}); ok {
-						poly := convertToPolygonCoords(pc)
-						polygons = append(polygons, poly)
+						poly := geojsonToPolyclipPolygon(pc)
+						if len(poly) > 0 {
+							polyPolygons = append(polyPolygons, poly)
+						}
 					}
 				}
 			}
 		}
 	}
 
-	if len(polygons) == 0 {
+	if len(polyPolygons) == 0 {
 		return nil, 0, fmt.Errorf("no valid geometries found")
 	}
 
-	// Create a MultiPolygon from all the polygons
-	// Note: This doesn't actually dissolve/merge touching polygons -
-	// for a proper implementation we'd need a spatial library
-	result := map[string]interface{}{
-		"type":        "MultiPolygon",
-		"coordinates": polygons,
+	// For a single polygon, just return it
+	if len(polyPolygons) == 1 {
+		return polyclipPolygonToGeoJSON(polyPolygons[0])
 	}
 
-	geojson, err := json.Marshal(result)
+	// Union all polygons together
+	result := polyPolygons[0]
+	for i := 1; i < len(polyPolygons); i++ {
+		result = result.Construct(polyclip.UNION, polyPolygons[i])
+	}
+
+	return polyclipPolygonToGeoJSON(result)
+}
+
+// geojsonToPolyclipPolygon converts GeoJSON polygon coordinates to polyclip.Polygon
+func geojsonToPolyclipPolygon(rings []interface{}) polyclip.Polygon {
+	poly := make(polyclip.Polygon, 0, len(rings))
+	for _, ring := range rings {
+		r, ok := ring.([]interface{})
+		if !ok {
+			continue
+		}
+		contour := make(polyclip.Contour, 0, len(r))
+		for _, coord := range r {
+			pt, ok := coord.([]interface{})
+			if !ok || len(pt) < 2 {
+				continue
+			}
+			x, _ := pt[0].(float64)
+			y, _ := pt[1].(float64)
+			contour = append(contour, polyclip.Point{X: x, Y: y})
+		}
+		if len(contour) > 0 {
+			poly = append(poly, contour)
+		}
+	}
+	return poly
+}
+
+// polyclipPolygonToGeoJSON converts polyclip.Polygon to GeoJSON
+func polyclipPolygonToGeoJSON(poly polyclip.Polygon) (json.RawMessage, float64, error) {
+	if len(poly) == 0 {
+		return nil, 0, fmt.Errorf("empty polygon")
+	}
+
+	// Convert polyclip polygon to GeoJSON coordinates
+	coords := make([][][2]float64, 0, len(poly))
+	for _, contour := range poly {
+		ring := make([][2]float64, 0, len(contour)+1)
+		for _, pt := range contour {
+			ring = append(ring, [2]float64{pt.X, pt.Y})
+		}
+		// Close the ring if not already closed
+		if len(ring) > 0 && (ring[0] != ring[len(ring)-1]) {
+			ring = append(ring, ring[0])
+		}
+		coords = append(coords, ring)
+	}
+
+	result := map[string]interface{}{
+		"type":        "Polygon",
+		"coordinates": coords,
+	}
+
+	resultJSON, err := json.Marshal(result)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to marshal result: %w", err)
 	}
 
-	return geojson, 0, nil
+	return resultJSON, 0, nil
 }
 
 // convertToPolygonCoords converts interface{} coordinates to typed polygon coords

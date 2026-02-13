@@ -222,6 +222,9 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
   // Identify mode state
   const [isIdentifyMode, setIsIdentifyMode] = useState(false);
 
+  // Maps ready state - triggers re-render when maps finish loading
+  const [areMapsReady, setAreMapsReady] = useState(false);
+
   // 3D mode state
   const [is3DMode, setIs3DMode] = useState(false);
   const is3DModeRef = useRef(is3DMode);
@@ -424,47 +427,56 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
    */
   function moveSiteBoundaryToTop(map: maplibregl.Map) {
     // Re-add site boundary layers on top by removing and re-adding them
-    if (map.getSource(SITE_BOUNDARY_SOURCE)) {
+    if (!map.getSource(SITE_BOUNDARY_SOURCE)) {
+      return; // No boundary source, nothing to move
+    }
+
+    try {
       // Remove existing layers (not source)
       if (map.getLayer(SITE_BOUNDARY_LINE)) map.removeLayer(SITE_BOUNDARY_LINE);
       if (map.getLayer(SITE_BOUNDARY_GLOW_MIDDLE)) map.removeLayer(SITE_BOUNDARY_GLOW_MIDDLE);
       if (map.getLayer(SITE_BOUNDARY_GLOW_OUTER)) map.removeLayer(SITE_BOUNDARY_GLOW_OUTER);
 
       // Re-add layers (they'll be on top now)
+      // Fully transparent fill (outline only)
       map.addLayer({
         id: SITE_BOUNDARY_GLOW_OUTER,
-        type: 'line',
+        type: 'fill',
         source: SITE_BOUNDARY_SOURCE,
         paint: {
-          'line-color': '#FF00FF',
-          'line-width': 20,
-          'line-opacity': 0.5,
-          'line-blur': 12,
+          'fill-color': '#FF00FF',
+          'fill-opacity': 0,
         },
       });
 
+      // Glow line around boundary
       map.addLayer({
         id: SITE_BOUNDARY_GLOW_MIDDLE,
         type: 'line',
         source: SITE_BOUNDARY_SOURCE,
         paint: {
-          'line-color': '#FF44FF',
-          'line-width': 10,
-          'line-opacity': 0.7,
-          'line-blur': 6,
+          'line-color': '#FF00FF',
+          'line-width': 14,
+          'line-opacity': 0.5,
+          'line-blur': 8,
         },
       });
 
+      // Core solid line
       map.addLayer({
         id: SITE_BOUNDARY_LINE,
         type: 'line',
         source: SITE_BOUNDARY_SOURCE,
         paint: {
-          'line-color': '#FFAAFF',
-          'line-width': 5,
+          'line-color': '#FF00FF',
+          'line-width': 4,
           'line-opacity': 1,
         },
       });
+
+      console.log('Site boundary moved to top');
+    } catch (err) {
+      console.error('Error moving site boundary to top:', err);
     }
   }
 
@@ -822,14 +834,20 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
       // Ensure proper sizing after load
       updateMapSizes();
       leftMap.resize();
-      if (mapsReady.current.right) applyColors();
+      if (mapsReady.current.right) {
+        applyColors();
+        setAreMapsReady(true);
+      }
     });
     rightMap.on('load', () => {
       mapsReady.current.right = true;
       // Ensure proper sizing after load
       updateMapSizes();
       rightMap.resize();
-      if (mapsReady.current.left) applyColors();
+      if (mapsReady.current.left) {
+        applyColors();
+        setAreMapsReady(true);
+      }
     });
 
     leftMapRef.current = leftMap;
@@ -887,6 +905,7 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
 
     return () => {
       mapsReady.current = { left: false, right: false };
+      setAreMapsReady(false);
       if (fetchTimerRef.current) {
         clearTimeout(fetchTimerRef.current);
       }
@@ -1001,13 +1020,13 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     }
   }, [identifyResult]);
 
-  // Fetch and display site boundary when siteId changes
+  // Fetch and display site boundary when siteId changes or maps become ready
   useEffect(() => {
     const leftMap = leftMapRef.current;
     const rightMap = rightMapRef.current;
 
-    if (!leftMap || !rightMap) return;
-    if (!mapsReady.current.left || !mapsReady.current.right) return;
+    // Wait until maps are ready (state-based trigger ensures re-run)
+    if (!leftMap || !rightMap || !areMapsReady) return;
 
     // Helper to remove site boundary layers from a map
     const removeSiteBoundary = (map: maplibregl.Map) => {
@@ -1019,6 +1038,7 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
 
     // Helper to add glowing neon boundary layers
     const addSiteBoundary = (map: maplibregl.Map, geometry: GeoJSON.Geometry) => {
+      console.log('Adding site boundary to map, geometry type:', geometry.type);
       removeSiteBoundary(map);
 
       // Add GeoJSON source
@@ -1031,43 +1051,43 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
         },
       });
 
-      // Outer glow layer (wide, transparent neon pink) - always at top
+      // Fully transparent fill (outline only)
       map.addLayer({
         id: SITE_BOUNDARY_GLOW_OUTER,
-        type: 'line',
+        type: 'fill',
         source: SITE_BOUNDARY_SOURCE,
         paint: {
-          'line-color': '#FF00FF',  // Magenta/pink
-          'line-width': 20,
-          'line-opacity': 0.5,
-          'line-blur': 12,
+          'fill-color': '#FF00FF',
+          'fill-opacity': 0,
         },
       });
 
-      // Middle glow layer (medium, semi-transparent pink)
+      // Glow line around boundary
       map.addLayer({
         id: SITE_BOUNDARY_GLOW_MIDDLE,
         type: 'line',
         source: SITE_BOUNDARY_SOURCE,
         paint: {
-          'line-color': '#FF44FF',  // Lighter pink
-          'line-width': 10,
-          'line-opacity': 0.7,
-          'line-blur': 6,
+          'line-color': '#FF00FF',
+          'line-width': 14,
+          'line-opacity': 0.5,
+          'line-blur': 8,
         },
       });
 
-      // Core line (bright solid hot pink)
+      // Core solid line
       map.addLayer({
         id: SITE_BOUNDARY_LINE,
         type: 'line',
         source: SITE_BOUNDARY_SOURCE,
         paint: {
-          'line-color': '#FFAAFF',  // Brighter light pink
-          'line-width': 5,
+          'line-color': '#FF00FF',
+          'line-width': 4,
           'line-opacity': 1,
         },
       });
+
+      console.log('Site boundary layers added');
     };
 
     // If no site, remove boundaries
@@ -1109,7 +1129,7 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
       if (leftMapRef.current) removeSiteBoundary(leftMapRef.current);
       if (rightMapRef.current) removeSiteBoundary(rightMapRef.current);
     };
-  }, [siteId]);
+  }, [siteId, areMapsReady]);
 
   // Zoom to site bounds when siteBounds changes (with 10% padding)
   useEffect(() => {
