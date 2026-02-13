@@ -50,6 +50,9 @@ type Site struct {
 	Area           float64            `json:"area"`                // Area in square kilometers
 	CreationMethod SiteCreationMethod `json:"creationMethod"`      // How the boundary was created
 	CatchmentIDs   []string           `json:"catchmentIds"`        // If created from catchments, store their IDs
+
+	// Site indicators (aggregated from catchments)
+	Indicators *SiteIndicators `json:"indicators,omitempty"` // Aggregated indicator values
 }
 
 // BoundingBox represents a geographic bounding box
@@ -58,6 +61,22 @@ type BoundingBox struct {
 	MinY float64 `json:"minY"` // South
 	MaxX float64 `json:"maxX"` // East
 	MaxY float64 `json:"maxY"` // North
+}
+
+// SiteIndicators holds aggregated indicator values for a site
+// All values are area-weighted aggregations of constituent catchments
+type SiteIndicators struct {
+	// Reference scenario values (historical baseline)
+	Reference map[string]float64 `json:"reference"`
+	// Current scenario values (current observed conditions)
+	Current map[string]float64 `json:"current"`
+	// Ideal values (starts as copy of current, user-editable)
+	Ideal map[string]float64 `json:"ideal"`
+	// Metadata about the extraction
+	ExtractedAt     string   `json:"extractedAt"`     // When indicators were extracted
+	CatchmentCount  int      `json:"catchmentCount"`  // Number of catchments used
+	TotalAreaKm2    float64  `json:"totalAreaKm2"`    // Total area in km²
+	CatchmentIDs    []string `json:"catchmentIds"`    // IDs of catchments used
 }
 
 // Store handles site persistence
@@ -211,6 +230,11 @@ func (s *Store) Update(id string, updates *Site) (*Site, error) {
 		site.LayoutMode = updates.LayoutMode
 	}
 	site.FocusedPane = updates.FocusedPane
+
+	// Indicators update
+	if updates.Indicators != nil {
+		site.Indicators = updates.Indicators
+	}
 
 	site.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 

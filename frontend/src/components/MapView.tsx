@@ -9,7 +9,6 @@ import { registerMap, unregisterMap } from '../hooks/useMapSync';
 
 interface MapViewProps {
   comparison: ComparisonState;
-  paneIndex: number;
   onOpenSettings: () => void;
   onIdentify?: (result: IdentifyResult) => void;
   identifyResult?: IdentifyResult;
@@ -210,7 +209,7 @@ const EDIT_VERTICES_GLOW = 'edit-vertices-glow';
 const EDIT_VERTICES_OUTER = 'edit-vertices-outer';
 const EDIT_VERTICES_INNER = 'edit-vertices-inner';
 
-function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify, identifyResult, onMapExtentChange, onStatisticsChange, isPanelOpen, siteId, siteBounds, isBoundaryEditMode, siteGeometry, onBoundaryUpdate }: MapViewProps) {
+function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMapExtentChange, onStatisticsChange, isPanelOpen, siteId, siteBounds, isBoundaryEditMode, siteGeometry, onBoundaryUpdate }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const leftMapRef = useRef<maplibregl.Map | null>(null);
   const rightMapRef = useRef<maplibregl.Map | null>(null);
@@ -346,6 +345,9 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
    * Remove choropleth layers from a map.
    */
   function removeChoroplethLayers(map: maplibregl.Map, side: string) {
+    // Safety check: map.style is undefined after map.remove() is called
+    if (!map.style) return;
+
     const layerId = `choropleth-${side}`;
     const sourceId = `choropleth-source-${side}`;
 
@@ -914,6 +916,10 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
       slider.removeEventListener('pointermove', onSliderPointerMove);
       slider.removeEventListener('pointerup', onSliderPointerUp);
       slider.removeEventListener('pointercancel', onSliderPointerUp);
+      // Clear refs BEFORE removing maps to prevent other cleanup effects from
+      // trying to access destroyed map instances
+      leftMapRef.current = null;
+      rightMapRef.current = null;
       leftMap.remove();
       rightMap.remove();
     };
@@ -959,6 +965,8 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
 
     // Helper to remove highlight layers from a map
     const removeHighlight = (map: maplibregl.Map) => {
+      // Safety check: map.style is undefined after map.remove() is called
+      if (!map.style) return;
       if (map.getLayer(IDENTIFY_HIGHLIGHT_LINE)) map.removeLayer(IDENTIFY_HIGHLIGHT_LINE);
       if (map.getLayer(IDENTIFY_HIGHLIGHT_GLOW)) map.removeLayer(IDENTIFY_HIGHLIGHT_GLOW);
     };
@@ -1030,6 +1038,8 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
 
     // Helper to remove site boundary layers from a map
     const removeSiteBoundary = (map: maplibregl.Map) => {
+      // Safety check: map.style is undefined after map.remove() is called
+      if (!map.style) return;
       if (map.getLayer(SITE_BOUNDARY_LINE)) map.removeLayer(SITE_BOUNDARY_LINE);
       if (map.getLayer(SITE_BOUNDARY_GLOW_MIDDLE)) map.removeLayer(SITE_BOUNDARY_GLOW_MIDDLE);
       if (map.getLayer(SITE_BOUNDARY_GLOW_OUTER)) map.removeLayer(SITE_BOUNDARY_GLOW_OUTER);
@@ -1287,6 +1297,8 @@ function MapView({ comparison, paneIndex: _paneIndex, onOpenSettings, onIdentify
     const rightMap = rightMapRef.current;
 
     const removeLayers = (map: maplibregl.Map) => {
+      // Safety check: map.style is undefined after map.remove() is called
+      if (!map.style) return;
       if (map.getLayer(EDIT_VERTICES_INNER)) map.removeLayer(EDIT_VERTICES_INNER);
       if (map.getLayer(EDIT_VERTICES_OUTER)) map.removeLayer(EDIT_VERTICES_OUTER);
       if (map.getLayer(EDIT_VERTICES_GLOW)) map.removeLayer(EDIT_VERTICES_GLOW);

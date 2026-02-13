@@ -125,7 +125,7 @@ export type IdentifyResult = {
   data: Record<string, Record<string, number>>;
 } | null;
 
-export type AppPage = 'landing' | 'about' | 'sites' | 'create-site' | 'map' | 'explore';
+export type AppPage = 'landing' | 'about' | 'sites' | 'create-site' | 'map' | 'explore' | 'indicators';
 
 // Statistics for the visible zone (viewport)
 export interface ZoneStats {
@@ -170,7 +170,7 @@ export function saveCurrentSite(siteId: string | null): void {
 export function loadCurrentPage(): AppPage {
   try {
     const raw = localStorage.getItem(STORAGE_CURRENT_PAGE_KEY);
-    if (raw === 'landing' || raw === 'about' || raw === 'sites' || raw === 'create-site' || raw === 'map' || raw === 'explore') {
+    if (raw === 'landing' || raw === 'about' || raw === 'sites' || raw === 'create-site' || raw === 'map' || raw === 'explore' || raw === 'indicators') {
       return raw;
     }
   } catch { /* default */ }
@@ -188,6 +188,22 @@ export interface BoundingBox {
   minY: number;  // South
   maxX: number;  // East
   maxY: number;  // North
+}
+
+// SiteIndicators holds aggregated indicator values for a site
+// All values are area-weighted aggregations of constituent catchments
+export interface SiteIndicators {
+  // Reference scenario values (historical baseline)
+  reference: Record<string, number>;
+  // Current scenario values (current observed conditions)
+  current: Record<string, number>;
+  // Ideal values (starts as copy of current, user-editable)
+  ideal: Record<string, number>;
+  // Metadata about the extraction
+  extractedAt: string;      // When indicators were extracted
+  catchmentCount: number;   // Number of catchments used
+  totalAreaKm2: number;     // Total area in km²
+  catchmentIds: string[];   // IDs of catchments used
 }
 
 // Site represents a saved site with its boundary and map state
@@ -211,6 +227,9 @@ export interface Site {
   area?: number;  // Area in square kilometers
   creationMethod?: SiteCreationMethod;
   catchmentIds?: string[];  // If created from catchments
+
+  // Site indicators (aggregated from catchments)
+  indicators?: SiteIndicators;
 }
 
 export interface CreateSiteRequest {

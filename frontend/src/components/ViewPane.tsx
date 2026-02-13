@@ -79,7 +79,6 @@ function ViewPane({
       >
         <MapView
           comparison={comparison}
-          paneIndex={paneIndex}
           onOpenSettings={() => onFocusPane(paneIndex)}
           onIdentify={onIdentify}
           identifyResult={identifyResult}

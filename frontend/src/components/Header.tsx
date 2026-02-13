@@ -9,7 +9,7 @@ import {
   useColorModeValue,
   Tooltip,
 } from '@chakra-ui/react';
-import { FiLayers, FiHelpCircle, FiHome, FiMapPin, FiMap, FiEdit2 } from 'react-icons/fi';
+import { FiLayers, FiHelpCircle, FiHome, FiMapPin, FiMap, FiEdit2, FiBarChart2 } from 'react-icons/fi';
 import { useServerInfo } from '../hooks/useApi';
 import type { AppPage } from '../types';
 
@@ -67,7 +67,7 @@ function Header({ onToggleDocs, isDocsOpen, onNavigate, currentPage, siteTitle, 
           </Badge>
         )}
         {/* Site title - show when viewing a site */}
-        {siteTitle && currentPage === 'map' && (
+        {siteTitle && (currentPage === 'map' || currentPage === 'indicators') && (
           <>
             <Text color="gray.400" fontSize="lg" fontWeight="light" mx={2}>
               /
@@ -129,17 +129,31 @@ function Header({ onToggleDocs, isDocsOpen, onNavigate, currentPage, siteTitle, 
                 size="sm"
               />
             </Tooltip>
-            {currentPage === 'map' && (
-              <Tooltip label="Current site map">
-                <IconButton
-                  aria-label="Map view"
-                  icon={<FiMap />}
-                  variant="solid"
-                  colorScheme="brand"
-                  size="sm"
-                  isDisabled
-                />
-              </Tooltip>
+            {(currentPage === 'map' || currentPage === 'indicators') && (
+              <>
+                <Tooltip label="Map view">
+                  <IconButton
+                    aria-label="Map view"
+                    icon={<FiMap />}
+                    onClick={() => onNavigate('map')}
+                    variant={currentPage === 'map' ? 'solid' : 'ghost'}
+                    colorScheme="brand"
+                    size="sm"
+                  />
+                </Tooltip>
+                {siteTitle && (
+                  <Tooltip label="Site indicators">
+                    <IconButton
+                      aria-label="Indicators"
+                      icon={<FiBarChart2 />}
+                      onClick={() => onNavigate('indicators')}
+                      variant={currentPage === 'indicators' ? 'solid' : 'ghost'}
+                      colorScheme="brand"
+                      size="sm"
+                    />
+                  </Tooltip>
+                )}
+              </>
             )}
           </HStack>
         )}

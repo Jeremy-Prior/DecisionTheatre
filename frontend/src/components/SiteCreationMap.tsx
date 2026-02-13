@@ -143,6 +143,7 @@ function SiteCreationMap({
       center: initialExtent?.center || [22.977, 1.258],
       zoom: initialExtent?.zoom || 4,
       attributionControl: false,
+      preserveDrawingBuffer: true, // Required for canvas thumbnail capture
     });
 
     map.addControl(new maplibregl.NavigationControl(), 'top-right');

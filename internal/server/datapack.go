@@ -13,20 +13,9 @@ import (
 
 	"github.com/kartoza/decision-theatre/internal/config"
 	"github.com/kartoza/decision-theatre/internal/geodata"
+	"github.com/kartoza/decision-theatre/internal/httputil"
 	"github.com/kartoza/decision-theatre/internal/tiles"
 )
-
-// respondJSON sends a JSON response
-func respondJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
-}
-
-// respondError sends a JSON error response
-func respondError(w http.ResponseWriter, status int, message string) {
-	respondJSON(w, status, map[string]string{"error": message})
-}
 
 // datapackManifest describes the contents of a data pack zip
 type datapackManifest struct {
@@ -40,7 +29,7 @@ type datapackManifest struct {
 func (s *Server) handleDatapackStatus(w http.ResponseWriter, r *http.Request) {
 	settings, err := config.LoadSettings()
 	if err != nil {
-		respondJSON(w, http.StatusOK, map[string]interface{}{
+		httputil.RespondJSON(w, http.StatusOK, map[string]interface{}{
 			"installed": false,
 			"error":     err.Error(),
 		})
@@ -48,7 +37,7 @@ func (s *Server) handleDatapackStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if settings.DataPackPath == "" {
-		respondJSON(w, http.StatusOK, map[string]interface{}{
+		httputil.RespondJSON(w, http.StatusOK, map[string]interface{}{
 			"installed": false,
 		})
 		return
@@ -56,7 +45,7 @@ func (s *Server) handleDatapackStatus(w http.ResponseWriter, r *http.Request) {
 
 	// Check if path still exists
 	if _, err := os.Stat(settings.DataPackPath); err != nil {
-		respondJSON(w, http.StatusOK, map[string]interface{}{
+		httputil.RespondJSON(w, http.StatusOK, map[string]interface{}{
 			"installed": false,
 			"error":     "data pack path no longer exists",
 		})
@@ -70,7 +59,7 @@ func (s *Server) handleDatapackStatus(w http.ResponseWriter, r *http.Request) {
 		json.Unmarshal(data, &manifest)
 	}
 
-	respondJSON(w, http.StatusOK, map[string]interface{}{
+	httputil.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"installed":   true,
 		"path":        settings.DataPackPath,
 		"version":     manifest.Version,
@@ -84,47 +73,47 @@ func (s *Server) handleDatapackInstall(w http.ResponseWriter, r *http.Request) {
 		Path string `json:"path"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "invalid request body")
+		httputil.RespondError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	if req.Path == "" {
-		respondError(w, http.StatusBadRequest, "path is required")
+		httputil.RespondError(w, http.StatusBadRequest, "path is required")
 		return
 	}
 
 	// Validate file exists and is a zip
 	if _, err := os.Stat(req.Path); err != nil {
-		respondError(w, http.StatusBadRequest, fmt.Sprintf("file not found: %s", req.Path))
+		httputil.RespondError(w, http.StatusBadRequest, fmt.Sprintf("file not found: %s", req.Path))
 		return
 	}
 	if !strings.HasSuffix(strings.ToLower(req.Path), ".zip") {
-		respondError(w, http.StatusBadRequest, "file must be a .zip archive")
+		httputil.RespondError(w, http.StatusBadRequest, "file must be a .zip archive")
 		return
 	}
 
 	// Determine extraction target
 	storeDir, err := config.DataStoreDir()
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, fmt.Sprintf("could not determine data directory: %v", err))
+		httputil.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("could not determine data directory: %v", err))
 		return
 	}
 	extractDir := filepath.Join(storeDir, "datapacks")
 	if err := os.MkdirAll(extractDir, 0o755); err != nil {
-		respondError(w, http.StatusInternalServerError, fmt.Sprintf("could not create directory: %v", err))
+		httputil.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("could not create directory: %v", err))
 		return
 	}
 
 	// Extract zip
 	packDir, err := extractDatapack(req.Path, extractDir)
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, fmt.Sprintf("extraction failed: %v", err))
+		httputil.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("extraction failed: %v", err))
 		return
 	}
 
 	// Validate extracted contents
 	if _, err := os.Stat(filepath.Join(packDir, "resources")); err != nil {
-		respondError(w, http.StatusBadRequest, "invalid data pack: missing resources/ directory")
+		httputil.RespondError(w, http.StatusBadRequest, "invalid data pack: missing resources/ directory")
 		return
 	}
 
@@ -132,7 +121,7 @@ func (s *Server) handleDatapackInstall(w http.ResponseWriter, r *http.Request) {
 	settings, _ := config.LoadSettings()
 	settings.DataPackPath = packDir
 	if err := config.SaveSettings(settings); err != nil {
-		respondError(w, http.StatusInternalServerError, fmt.Sprintf("could not save settings: %v", err))
+		httputil.RespondError(w, http.StatusInternalServerError, fmt.Sprintf("could not save settings: %v", err))
 		return
 	}
 
@@ -140,7 +129,7 @@ func (s *Server) handleDatapackInstall(w http.ResponseWriter, r *http.Request) {
 	s.reloadDataStores(packDir)
 
 	log.Printf("Data pack installed: %s", packDir)
-	respondJSON(w, http.StatusOK, map[string]interface{}{
+	httputil.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"installed": true,
 		"path":      packDir,
 		"message":   "Data pack installed successfully. The application will reload.",

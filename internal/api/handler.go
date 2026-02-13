@@ -5,10 +5,12 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/kartoza/decision-theatre/internal/config"
 	"github.com/kartoza/decision-theatre/internal/geodata"
+	"github.com/kartoza/decision-theatre/internal/httputil"
 	"github.com/kartoza/decision-theatre/internal/sites"
 	"github.com/kartoza/decision-theatre/internal/tiles"
 )
@@ -69,20 +71,21 @@ func (h *Handler) RegisterRoutes(r *mux.Router) {
 	// Catchment selection for site creation
 	r.HandleFunc("/sites/dissolve-catchments", h.handleDissolveCatchments).Methods("POST")
 	r.HandleFunc("/catchments/geometry/{id}", h.handleCatchmentGeometry).Methods("GET")
+
+	// Site indicators
+	r.HandleFunc("/sites/{id}/indicators", h.handleExtractIndicators).Methods("POST")
+	r.HandleFunc("/sites/{id}/indicators", h.handleUpdateIndicators).Methods("PATCH")
+	r.HandleFunc("/sites/{id}/indicators/reset", h.handleResetIdealIndicators).Methods("POST")
 }
 
-// respondJSON sends a JSON response
+// respondJSON sends a JSON response (delegates to httputil)
 func respondJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		log.Printf("Error encoding response: %v", err)
-	}
+	httputil.RespondJSON(w, status, data)
 }
 
-// respondError sends a JSON error response
+// respondError sends a JSON error response (delegates to httputil)
 func respondError(w http.ResponseWriter, status int, message string) {
-	respondJSON(w, status, map[string]string{"error": message})
+	httputil.RespondError(w, status, message)
 }
 
 // handleHealth returns server health status
@@ -528,4 +531,206 @@ func (h *Handler) handleCatchmentGeometry(w http.ResponseWriter, r *http.Request
 	}
 
 	respondJSON(w, http.StatusOK, features[0])
+}
+
+// ============================================================================
+// Site Indicators Handlers
+// ============================================================================
+
+// handleExtractIndicators extracts and stores indicators for a site from its catchments
+// This performs area-weighted aggregation of all indicator values
+func (h *Handler) handleExtractIndicators(w http.ResponseWriter, r *http.Request) {
+	if h.siteStore == nil {
+		respondError(w, http.StatusInternalServerError, "site store not initialized")
+		return
+	}
+	if h.gpkgStore == nil {
+		respondError(w, http.StatusServiceUnavailable, "geopackage store not available")
+		return
+	}
+
+	id := mux.Vars(r)["id"]
+	site, err := h.siteStore.Get(id)
+	if err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	// Get catchment IDs for this site
+	catchmentIDs := site.CatchmentIDs
+	if len(catchmentIDs) == 0 {
+		respondError(w, http.StatusBadRequest, "site has no associated catchments")
+		return
+	}
+
+	// Get indicator data for all catchments
+	catchmentData, err := h.gpkgStore.GetCatchmentIndicatorsByIDs(catchmentIDs)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to get catchment data: "+err.Error())
+		return
+	}
+
+	if len(catchmentData) == 0 {
+		respondError(w, http.StatusNotFound, "no data found for catchments")
+		return
+	}
+
+	// Compute area-weighted aggregations
+	indicators := computeAreaWeightedIndicators(catchmentData)
+	indicators.CatchmentIDs = catchmentIDs
+
+	// Update site with indicators
+	site.Indicators = indicators
+	updated, err := h.siteStore.Update(id, site)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to update site: "+err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, updated)
+}
+
+// computeAreaWeightedIndicators calculates area-weighted indicator aggregations
+func computeAreaWeightedIndicators(catchments []geodata.CatchmentIndicators) *sites.SiteIndicators {
+	indicators := &sites.SiteIndicators{
+		Reference:      make(map[string]float64),
+		Current:        make(map[string]float64),
+		Ideal:          make(map[string]float64),
+		ExtractedAt:    time.Now().UTC().Format(time.RFC3339),
+		CatchmentCount: len(catchments),
+	}
+
+	// Calculate total area
+	totalArea := 0.0
+	for _, c := range catchments {
+		totalArea += c.AreaKm2
+	}
+	indicators.TotalAreaKm2 = totalArea
+
+	if totalArea == 0 {
+		// Fallback to simple average if no area data
+		totalArea = float64(len(catchments))
+		for i := range catchments {
+			catchments[i].AreaKm2 = 1.0
+		}
+	}
+
+	// Collect all attribute keys
+	allKeys := make(map[string]bool)
+	for _, c := range catchments {
+		for k := range c.Reference {
+			allKeys[k] = true
+		}
+		for k := range c.Current {
+			allKeys[k] = true
+		}
+	}
+
+	// Compute area-weighted values for each attribute
+	for key := range allKeys {
+		refSum := 0.0
+		refWeight := 0.0
+		curSum := 0.0
+		curWeight := 0.0
+
+		for _, c := range catchments {
+			if val, ok := c.Reference[key]; ok {
+				refSum += val * c.AreaKm2
+				refWeight += c.AreaKm2
+			}
+			if val, ok := c.Current[key]; ok {
+				curSum += val * c.AreaKm2
+				curWeight += c.AreaKm2
+			}
+		}
+
+		if refWeight > 0 {
+			indicators.Reference[key] = refSum / refWeight
+		}
+		if curWeight > 0 {
+			indicators.Current[key] = curSum / curWeight
+			// Initialize ideal values as copy of current
+			indicators.Ideal[key] = curSum / curWeight
+		}
+	}
+
+	return indicators
+}
+
+// UpdateIndicatorsRequest represents a request to update ideal indicator values
+type UpdateIndicatorsRequest struct {
+	Ideal map[string]float64 `json:"ideal"`
+}
+
+// handleUpdateIndicators updates the ideal indicator values for a site
+func (h *Handler) handleUpdateIndicators(w http.ResponseWriter, r *http.Request) {
+	if h.siteStore == nil {
+		respondError(w, http.StatusInternalServerError, "site store not initialized")
+		return
+	}
+
+	id := mux.Vars(r)["id"]
+	site, err := h.siteStore.Get(id)
+	if err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	if site.Indicators == nil {
+		respondError(w, http.StatusBadRequest, "site has no indicators - extract them first")
+		return
+	}
+
+	var req UpdateIndicatorsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Update ideal values
+	for key, value := range req.Ideal {
+		site.Indicators.Ideal[key] = value
+	}
+
+	updated, err := h.siteStore.Update(id, site)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to update site: "+err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, updated)
+}
+
+// handleResetIdealIndicators resets ideal values to match current values
+func (h *Handler) handleResetIdealIndicators(w http.ResponseWriter, r *http.Request) {
+	if h.siteStore == nil {
+		respondError(w, http.StatusInternalServerError, "site store not initialized")
+		return
+	}
+
+	id := mux.Vars(r)["id"]
+	site, err := h.siteStore.Get(id)
+	if err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	if site.Indicators == nil {
+		respondError(w, http.StatusBadRequest, "site has no indicators")
+		return
+	}
+
+	// Reset ideal to current values
+	site.Indicators.Ideal = make(map[string]float64)
+	for key, value := range site.Indicators.Current {
+		site.Indicators.Ideal[key] = value
+	}
+
+	updated, err := h.siteStore.Update(id, site)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to update site: "+err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, updated)
 }

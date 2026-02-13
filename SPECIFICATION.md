@@ -258,3 +258,35 @@ Violet → Indigo → Blue → Cyan → Green → Yellow → Orange → Red
 - Pre-computed geojson column in GeoPackage
 - R-tree spatial index for fast bbox queries
 - Lazy loading of Arrow/Parquet files
+
+---
+
+## Security Considerations
+
+### SQL Injection Prevention
+- Attribute names are validated against an allowlist of known columns before use in queries
+- The `isValidColumn()` method in `GpkgStore` checks against `s.columns` to prevent injection
+
+### Input Validation
+- Site titles and descriptions are trimmed before storage
+- File uploads are validated for type and size
+- Zip files are checked for zip slip vulnerabilities during extraction
+
+---
+
+## Code Organization
+
+### Backend Packages (`internal/`)
+- **api**: HTTP handlers for REST endpoints
+- **config**: Application configuration and settings persistence
+- **geodata**: GeoPackage and GeoParquet data access
+- **httputil**: Shared HTTP response utilities
+- **server**: HTTP server setup and routing
+- **sites**: Site CRUD operations and JSON persistence
+- **tiles**: MBTiles vector tile serving
+
+### Frontend Structure (`frontend/src/`)
+- **components/**: React UI components
+- **hooks/**: Custom React hooks (API, map sync)
+- **types/**: TypeScript interfaces and storage utilities
+- **styles/**: Chakra UI theme configuration

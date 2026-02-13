@@ -9,6 +9,7 @@ import LandingPage from './components/LandingPage';
 import AboutPage from './components/AboutPage';
 import SitesPage from './components/SitesPage';
 import SiteCreationPage from './components/SiteCreationPage';
+import IndicatorEditorPage from './components/IndicatorEditorPage';
 import { useServerInfo } from './hooks/useApi';
 import type { Scenario, LayoutMode, PaneStates, ComparisonState, AppPage, Site, IdentifyResult, MapExtent, MapStatistics } from './types';
 import {
@@ -37,7 +38,6 @@ function App() {
   const [currentPage, setCurrentPage] = useState<AppPage>(loadCurrentPage);
   const [currentSiteId, setCurrentSiteId] = useState<string | null>(loadCurrentSite);
   const [currentSite, setCurrentSite] = useState<Site | null>(null);
-  const [, setCloneFromSite] = useState<Site | null>(null);
   const [editSite, setEditSite] = useState<Site | null>(null);
   const [identifyResult, setIdentifyResult] = useState<IdentifyResult>(null);
   const [mapExtent, setMapExtent] = useState<MapExtent | null>(null);
@@ -110,7 +110,6 @@ function App() {
       setCurrentPage(page);
       setIsExploreMode(false);
       if (page !== 'create-site') {
-        setCloneFromSite(null);
         setEditSite(null);
       }
     }
@@ -144,9 +143,11 @@ function App() {
     }, 500);
   }, []);
 
-  // Clone a site
+  // Clone a site - navigates to create-site with site data pre-filled
   const handleCloneSite = useCallback((site: Site) => {
-    setCloneFromSite(site);
+    // Set editSite to pre-fill the form, but it will create a new site
+    // since we're going to the create-site page without an existing ID
+    setEditSite({ ...site, id: '', title: `${site.title} (Copy)` });
     setCurrentPage('create-site');
   }, []);
 
@@ -326,6 +327,28 @@ function App() {
             onSiteCreated={handleSiteCreated}
             initialExtent={mapExtent || undefined}
             editSite={editSite}
+          />
+        </Box>
+        <DocsPanel isOpen={isDocsOpen} onClose={onCloseDocs} />
+      </Flex>
+    );
+  }
+
+  if (currentPage === 'indicators' && currentSite) {
+    return (
+      <Flex direction="column" h="100vh" overflow="hidden">
+        <Header
+          onToggleDocs={onToggleDocs}
+          isDocsOpen={isDocsOpen}
+          onNavigate={handleNavigate}
+          currentPage={currentPage}
+          siteTitle={currentSite.title}
+        />
+        <Box flex={1} overflow="hidden">
+          <IndicatorEditorPage
+            site={currentSite}
+            onNavigate={handleNavigate}
+            onSiteUpdated={(updatedSite: Site) => setCurrentSite(updatedSite)}
           />
         </Box>
         <DocsPanel isOpen={isDocsOpen} onClose={onCloseDocs} />

@@ -8,6 +8,7 @@ import maplibregl from 'maplibre-gl';
 type MapEntry = {
   map: maplibregl.Map;
   id: string;
+  handler: () => void;
 };
 
 const registry: MapEntry[] = [];
@@ -33,7 +34,9 @@ let nextId = 0;
 
 export function registerMap(map: maplibregl.Map): string {
   const id = `map-${nextId++}`;
-  registry.push({ map, id });
+  const handler = () => broadcastMove(id, map);
+
+  registry.push({ map, id, handler });
 
   // Sync new map to existing maps' position (if any exist)
   if (registry.length > 1) {
@@ -48,7 +51,6 @@ export function registerMap(map: maplibregl.Map): string {
     }
   }
 
-  const handler = () => broadcastMove(id, map);
   map.on('move', handler);
 
   return id;
@@ -57,6 +59,9 @@ export function registerMap(map: maplibregl.Map): string {
 export function unregisterMap(id: string) {
   const idx = registry.findIndex((e) => e.id === id);
   if (idx !== -1) {
+    const entry = registry[idx];
+    // Remove the event listener to prevent memory leaks
+    entry.map.off('move', entry.handler);
     registry.splice(idx, 1);
   }
 }

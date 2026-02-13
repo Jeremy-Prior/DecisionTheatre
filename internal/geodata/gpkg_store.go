@@ -119,6 +119,11 @@ func (s *GpkgStore) QueryCatchments(scenario, attribute string, minx, miny, maxx
 		tableName = "scenario_reference"
 	}
 
+	// Validate attribute against allowed columns to prevent SQL injection
+	if !s.isValidColumn(attribute) {
+		return nil, fmt.Errorf("invalid attribute: %s", attribute)
+	}
+
 	// Use pre-computed geojson column - much faster than WKB conversion
 	// Only select the fields we need (no geometry blob)
 	// Use integer columns for faster index-based joins
@@ -403,8 +408,25 @@ type DomainRange struct {
 	Max float64 `json:"max"`
 }
 
+// isValidColumn checks if the given attribute name is in the allowed columns list
+func (s *GpkgStore) isValidColumn(attribute string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, col := range s.columns {
+		if col == attribute {
+			return true
+		}
+	}
+	return false
+}
+
 // GetDomainRange returns the min and max values for an attribute across all scenarios
 func (s *GpkgStore) GetDomainRange(attribute string) (*DomainRange, error) {
+	// Validate attribute against allowed columns to prevent SQL injection
+	if !s.isValidColumn(attribute) {
+		return nil, fmt.Errorf("invalid attribute: %s", attribute)
+	}
+
 	var minVal, maxVal sql.NullFloat64
 
 	// Query domain_minima table
@@ -579,28 +601,6 @@ func polyclipPolygonToGeoJSON(poly polyclip.Polygon) (json.RawMessage, float64, 
 	return resultJSON, 0, nil
 }
 
-// convertToPolygonCoords converts interface{} coordinates to typed polygon coords
-func convertToPolygonCoords(rings []interface{}) [][][2]float64 {
-	result := make([][][2]float64, 0, len(rings))
-	for _, ring := range rings {
-		r, ok := ring.([]interface{})
-		if !ok {
-			continue
-		}
-		ringCoords := make([][2]float64, 0, len(r))
-		for _, coord := range r {
-			c, ok := coord.([]interface{})
-			if !ok || len(c) < 2 {
-				continue
-			}
-			x, _ := c[0].(float64)
-			y, _ := c[1].(float64)
-			ringCoords = append(ringCoords, [2]float64{x, y})
-		}
-		result = append(result, ringCoords)
-	}
-	return result
-}
 
 // GetCatchmentAttributes returns all attributes for a specific catchment across both scenarios
 // Returns a map: scenario -> attribute -> value
@@ -665,6 +665,133 @@ func (s *GpkgStore) GetCatchmentAttributes(catchmentID string) map[string]map[st
 	}
 
 	return result
+}
+
+// CatchmentIndicators represents indicator values for a single catchment
+type CatchmentIndicators struct {
+	ID        string             `json:"id"`
+	AreaKm2   float64            `json:"areaKm2"`
+	Reference map[string]float64 `json:"reference"`
+	Current   map[string]float64 `json:"current"`
+}
+
+// GetCatchmentIndicatorsByIDs returns indicator values for multiple catchments
+// Used for area-weighted aggregation in site calculations
+func (s *GpkgStore) GetCatchmentIndicatorsByIDs(ids []string) ([]CatchmentIndicators, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	s.mu.RLock()
+	columns := s.columns
+	s.mu.RUnlock()
+
+	if len(columns) == 0 {
+		return nil, fmt.Errorf("no columns loaded")
+	}
+
+	// Build placeholders
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	results := make([]CatchmentIndicators, 0, len(ids))
+
+	// Query each scenario
+	scenarios := []string{"current", "reference"}
+	scenarioData := make(map[string]map[string]map[string]float64) // scenario -> catchmentID -> attribute -> value
+
+	for _, scenario := range scenarios {
+		tableName := "scenario_" + scenario
+
+		// Build SELECT query for all columns
+		quotedCols := make([]string, len(columns))
+		for i, col := range columns {
+			quotedCols[i] = fmt.Sprintf(`"%s"`, col)
+		}
+
+		query := fmt.Sprintf(`
+			SELECT catchment_id, %s
+			FROM %s
+			WHERE catchment_id IN (%s)
+		`, strings.Join(quotedCols, ", "), tableName, strings.Join(placeholders, ","))
+
+		rows, err := s.db.Query(query, args...)
+		if err != nil {
+			log.Printf("Failed to query %s: %v", tableName, err)
+			continue
+		}
+
+		scenarioData[scenario] = make(map[string]map[string]float64)
+
+		for rows.Next() {
+			// Scan catchment_id + all columns
+			values := make([]sql.NullFloat64, len(columns))
+			var catchmentID string
+			scanArgs := make([]interface{}, len(columns)+1)
+			scanArgs[0] = &catchmentID
+			for i := range values {
+				scanArgs[i+1] = &values[i]
+			}
+
+			if err := rows.Scan(scanArgs...); err != nil {
+				continue
+			}
+
+			attrs := make(map[string]float64)
+			for i, col := range columns {
+				if values[i].Valid {
+					attrs[col] = values[i].Float64
+				}
+			}
+			scenarioData[scenario][catchmentID] = attrs
+		}
+		rows.Close()
+	}
+
+	// Get catchment areas from geometry table
+	areaQuery := fmt.Sprintf(`
+		SELECT CAST(HYBAS_ID AS TEXT), SUB_AREA
+		FROM catchments_lev12
+		WHERE HYBAS_ID IN (%s)
+	`, strings.Join(placeholders, ","))
+
+	areaRows, err := s.db.Query(areaQuery, args...)
+	if err != nil {
+		log.Printf("Failed to query areas: %v", err)
+	} else {
+		defer areaRows.Close()
+		for areaRows.Next() {
+			var catchmentID string
+			var area sql.NullFloat64
+			if err := areaRows.Scan(&catchmentID, &area); err != nil {
+				continue
+			}
+
+			// Normalize catchment ID by removing ".0" suffix if present
+			// This handles the case where HYBAS_ID is REAL and gets ".0" appended
+			normalizedID := strings.TrimSuffix(catchmentID, ".0")
+
+			ci := CatchmentIndicators{
+				ID:        normalizedID,
+				AreaKm2:   area.Float64,
+				Reference: scenarioData["reference"][normalizedID],
+				Current:   scenarioData["current"][normalizedID],
+			}
+			if ci.Reference == nil {
+				ci.Reference = make(map[string]float64)
+			}
+			if ci.Current == nil {
+				ci.Current = make(map[string]float64)
+			}
+			results = append(results, ci)
+		}
+	}
+
+	return results, nil
 }
 
 // GetCatchmentsByIDs returns catchment geometries for the given IDs
