@@ -199,6 +199,7 @@ function buildExtrusionExpression(
 
 // Layer IDs for site boundary
 const SITE_BOUNDARY_SOURCE = 'site-boundary-source';
+const SITE_BOUNDARY_OFFWHITE = 'site-boundary-offwhite';
 const SITE_BOUNDARY_GLOW_OUTER = 'site-boundary-glow-outer';
 const SITE_BOUNDARY_GLOW_MIDDLE = 'site-boundary-glow-middle';
 const SITE_BOUNDARY_LINE = 'site-boundary-line';
@@ -438,6 +439,7 @@ function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMap
       if (map.getLayer(SITE_BOUNDARY_LINE)) map.removeLayer(SITE_BOUNDARY_LINE);
       if (map.getLayer(SITE_BOUNDARY_GLOW_MIDDLE)) map.removeLayer(SITE_BOUNDARY_GLOW_MIDDLE);
       if (map.getLayer(SITE_BOUNDARY_GLOW_OUTER)) map.removeLayer(SITE_BOUNDARY_GLOW_OUTER);
+      if (map.getLayer(SITE_BOUNDARY_OFFWHITE)) map.removeLayer(SITE_BOUNDARY_OFFWHITE);
 
       // Re-add layers (they'll be on top now)
       // Fully transparent fill (outline only)
@@ -451,7 +453,19 @@ function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMap
         },
       });
 
-      // Glow line around boundary
+      // Thick semi-transparent off-white border (below the neon glow)
+      map.addLayer({
+        id: SITE_BOUNDARY_OFFWHITE,
+        type: 'line',
+        source: SITE_BOUNDARY_SOURCE,
+        paint: {
+          'line-color': '#F5F5F0',  // Off-white
+          'line-width': 20,
+          'line-opacity': 0.6,
+        },
+      });
+
+      // Neon glow line around boundary
       map.addLayer({
         id: SITE_BOUNDARY_GLOW_MIDDLE,
         type: 'line',
@@ -464,7 +478,7 @@ function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMap
         },
       });
 
-      // Core solid line
+      // Core solid neon line
       map.addLayer({
         id: SITE_BOUNDARY_LINE,
         type: 'line',
@@ -1042,11 +1056,12 @@ function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMap
       if (!map.style) return;
       if (map.getLayer(SITE_BOUNDARY_LINE)) map.removeLayer(SITE_BOUNDARY_LINE);
       if (map.getLayer(SITE_BOUNDARY_GLOW_MIDDLE)) map.removeLayer(SITE_BOUNDARY_GLOW_MIDDLE);
+      if (map.getLayer(SITE_BOUNDARY_OFFWHITE)) map.removeLayer(SITE_BOUNDARY_OFFWHITE);
       if (map.getLayer(SITE_BOUNDARY_GLOW_OUTER)) map.removeLayer(SITE_BOUNDARY_GLOW_OUTER);
       if (map.getSource(SITE_BOUNDARY_SOURCE)) map.removeSource(SITE_BOUNDARY_SOURCE);
     };
 
-    // Helper to add glowing neon boundary layers
+    // Helper to add glowing neon boundary layers with off-white backing
     const addSiteBoundary = (map: maplibregl.Map, geometry: GeoJSON.Geometry) => {
       console.log('Adding site boundary to map, geometry type:', geometry.type);
       removeSiteBoundary(map);
@@ -1072,7 +1087,19 @@ function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMap
         },
       });
 
-      // Glow line around boundary
+      // Thick semi-transparent off-white border (below the neon glow)
+      map.addLayer({
+        id: SITE_BOUNDARY_OFFWHITE,
+        type: 'line',
+        source: SITE_BOUNDARY_SOURCE,
+        paint: {
+          'line-color': '#F5F5F0',  // Off-white
+          'line-width': 20,
+          'line-opacity': 0.6,
+        },
+      });
+
+      // Neon glow line around boundary
       map.addLayer({
         id: SITE_BOUNDARY_GLOW_MIDDLE,
         type: 'line',
@@ -1085,7 +1112,7 @@ function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMap
         },
       });
 
-      // Core solid line
+      // Core solid neon line
       map.addLayer({
         id: SITE_BOUNDARY_LINE,
         type: 'line',
@@ -1188,6 +1215,89 @@ function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMap
   const editVerticesRef = useRef<[number, number][]>([]);
   const draggingVertexIndexRef = useRef<number | null>(null);
 
+  // Catchment edit mode: 'add' or 'remove' or null
+  const [catchmentEditMode, setCatchmentEditMode] = useState<'add' | 'remove' | null>(null);
+  const catchmentEditModeRef = useRef(catchmentEditMode);
+  catchmentEditModeRef.current = catchmentEditMode;
+
+  // Handle adding a catchment to the site boundary
+  const handleAddCatchment = useCallback(async (catchmentId: string) => {
+    if (!siteGeometryRef.current || !onBoundaryUpdateRef.current || !siteId) return;
+
+    try {
+      // Use the union API endpoint to merge the catchment with the site
+      const response = await fetch(`/api/sites/${siteId}/boundary/union/${catchmentId}`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.geometry) {
+          onBoundaryUpdateRef.current(result.geometry);
+        }
+      } else {
+        console.error('Failed to add catchment to boundary');
+      }
+    } catch (err) {
+      console.error('Error adding catchment:', err);
+    }
+  }, [siteId]);
+
+  // Handle removing a catchment from the site boundary
+  const handleRemoveCatchment = useCallback(async (catchmentId: string) => {
+    if (!siteGeometryRef.current || !onBoundaryUpdateRef.current || !siteId) return;
+
+    try {
+      // Use the difference API endpoint to remove the catchment from the site
+      const response = await fetch(`/api/sites/${siteId}/boundary/difference/${catchmentId}`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.geometry) {
+          onBoundaryUpdateRef.current(result.geometry);
+        }
+      } else {
+        console.error('Failed to remove catchment from boundary');
+      }
+    } catch (err) {
+      console.error('Error removing catchment:', err);
+    }
+  }, [siteId]);
+
+  // Handle catchment click in add/remove mode
+  const handleCatchmentEditClick = useCallback((map: maplibregl.Map, e: maplibregl.MapMouseEvent) => {
+    if (!catchmentEditModeRef.current) return;
+
+    // Query for catchment features at the click point
+    const layersToQuery: string[] = [];
+    if (map.getLayer('Catchments Outlines')) {
+      layersToQuery.push('Catchments Outlines');
+    }
+    // Also check choropleth layers
+    if (map.getLayer(CHOROPLETH_LAYER_LEFT)) layersToQuery.push(CHOROPLETH_LAYER_LEFT);
+    if (map.getLayer(CHOROPLETH_LAYER_RIGHT)) layersToQuery.push(CHOROPLETH_LAYER_RIGHT);
+    if (map.getLayer(CHOROPLETH_3D_LEFT)) layersToQuery.push(CHOROPLETH_3D_LEFT);
+    if (map.getLayer(CHOROPLETH_3D_RIGHT)) layersToQuery.push(CHOROPLETH_3D_RIGHT);
+
+    if (layersToQuery.length === 0) return;
+
+    const features = map.queryRenderedFeatures(e.point, { layers: layersToQuery });
+    if (features.length === 0) return;
+
+    const catchmentId = features[0].properties?.[CATCHMENT_ID_PROP];
+    if (!catchmentId) return;
+
+    const catchmentIdStr = String(catchmentId);
+
+    if (catchmentEditModeRef.current === 'add') {
+      handleAddCatchment(catchmentIdStr);
+    } else if (catchmentEditModeRef.current === 'remove') {
+      handleRemoveCatchment(catchmentIdStr);
+    }
+  }, [handleAddCatchment, handleRemoveCatchment]);
+
   // Extract vertices from geometry
   const extractVertices = useCallback((geometry: GeoJSON.Geometry | null | undefined): [number, number][] => {
     if (!geometry) return [];
@@ -1229,6 +1339,9 @@ function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMap
     if (!leftMap || !rightMap) return;
 
     const updateMapVertices = (map: maplibregl.Map) => {
+      // Safety check: map.style is undefined after map.remove() is called
+      if (!map.style) return;
+
       // Create feature collection for vertices
       const features: GeoJSON.Feature[] = vertices.map((coord, idx) => ({
         type: 'Feature',
@@ -1239,6 +1352,8 @@ function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMap
       const source = map.getSource(EDIT_VERTICES_SOURCE) as maplibregl.GeoJSONSource;
       if (source) {
         source.setData({ type: 'FeatureCollection', features });
+        // Force repaint to show updated vertex positions immediately
+        map.triggerRepaint();
       } else {
         // Add source and layers
         map.addSource(EDIT_VERTICES_SOURCE, {
@@ -1318,6 +1433,8 @@ function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMap
     const newGeometry = buildGeometryFromVertices(vertices, siteGeometryRef.current);
 
     const updateSource = (map: maplibregl.Map) => {
+      // Safety check: map.style is undefined after map.remove() is called
+      if (!map.style) return;
       const source = map.getSource(SITE_BOUNDARY_SOURCE) as maplibregl.GeoJSONSource;
       if (source) {
         source.setData({
@@ -1325,6 +1442,8 @@ function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMap
           properties: {},
           geometry: newGeometry,
         });
+        // Force repaint to show updated geometry immediately
+        map.triggerRepaint();
       }
     };
 
@@ -1425,6 +1544,44 @@ function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMap
       rightMap.getCanvas().style.cursor = '';
     }
   }, [isBoundaryEditMode, siteGeometry, extractVertices, updateEditVerticesLayer, removeEditVerticesLayers, updateBoundaryDisplay, buildGeometryFromVertices]);
+
+  // Handle catchment add/remove click events
+  useEffect(() => {
+    const leftMap = leftMapRef.current;
+    const rightMap = rightMapRef.current;
+
+    if (!leftMap || !rightMap || !isBoundaryEditMode || !catchmentEditMode) {
+      return;
+    }
+
+    // Change cursor based on mode
+    const cursor = catchmentEditMode === 'add' ? 'crosshair' : 'not-allowed';
+    leftMap.getCanvas().style.cursor = cursor;
+    rightMap.getCanvas().style.cursor = cursor;
+
+    const onLeftClick = (e: maplibregl.MapMouseEvent) => handleCatchmentEditClick(leftMap, e);
+    const onRightClick = (e: maplibregl.MapMouseEvent) => handleCatchmentEditClick(rightMap, e);
+
+    leftMap.on('click', onLeftClick);
+    rightMap.on('click', onRightClick);
+
+    return () => {
+      leftMap.off('click', onLeftClick);
+      rightMap.off('click', onRightClick);
+      // Restore cursor based on whether we're still in edit mode
+      if (isBoundaryEditModeRef.current) {
+        leftMap.getCanvas().style.cursor = 'grab';
+        rightMap.getCanvas().style.cursor = 'grab';
+      }
+    };
+  }, [isBoundaryEditMode, catchmentEditMode, handleCatchmentEditClick]);
+
+  // Reset catchment edit mode when boundary edit mode is disabled
+  useEffect(() => {
+    if (!isBoundaryEditMode) {
+      setCatchmentEditMode(null);
+    }
+  }, [isBoundaryEditMode]);
 
   // Check if panel is unconfigured (no indicator selected)
   const isUnconfigured = !comparison.attribute;
@@ -1649,7 +1806,11 @@ function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMap
               }}
             />
             <Text color="gray.900" fontWeight="bold" fontSize="sm">
-              Edit Mode: Drag vertices to reshape boundary
+              {catchmentEditMode === 'add'
+                ? 'Click catchments to ADD to boundary'
+                : catchmentEditMode === 'remove'
+                ? 'Click catchments to REMOVE from boundary'
+                : 'Edit Mode: Drag vertices to reshape boundary'}
             </Text>
           </Flex>
 
@@ -1669,28 +1830,32 @@ function MapView({ comparison, onOpenSettings, onIdentify, identifyResult, onMap
             <Text fontSize="xs" fontWeight="bold" color="cyan.300" letterSpacing="wider">
               CATCHMENTS
             </Text>
-            <Tooltip label="Add catchments to boundary" placement="left">
+            <Tooltip label={catchmentEditMode === 'add' ? "Cancel adding" : "Add catchments to boundary"} placement="left">
               <IconButton
                 aria-label="Add catchments"
                 icon={<FiPlus />}
                 size="sm"
                 variant="solid"
-                bg="green.500"
+                bg={catchmentEditMode === 'add' ? "cyan.400" : "green.500"}
                 color="white"
-                _hover={{ bg: "green.400", transform: "scale(1.05)" }}
+                onClick={() => setCatchmentEditMode(prev => prev === 'add' ? null : 'add')}
+                _hover={{ bg: catchmentEditMode === 'add' ? "cyan.300" : "green.400", transform: "scale(1.05)" }}
                 transition="all 0.2s"
+                boxShadow={catchmentEditMode === 'add' ? "0 0 12px rgba(0, 255, 255, 0.6)" : undefined}
               />
             </Tooltip>
-            <Tooltip label="Remove catchments from boundary" placement="left">
+            <Tooltip label={catchmentEditMode === 'remove' ? "Cancel removing" : "Remove catchments from boundary"} placement="left">
               <IconButton
                 aria-label="Remove catchments"
                 icon={<FiMinus />}
                 size="sm"
                 variant="solid"
-                bg="red.500"
+                bg={catchmentEditMode === 'remove' ? "cyan.400" : "red.500"}
                 color="white"
-                _hover={{ bg: "red.400", transform: "scale(1.05)" }}
+                onClick={() => setCatchmentEditMode(prev => prev === 'remove' ? null : 'remove')}
+                _hover={{ bg: catchmentEditMode === 'remove' ? "cyan.300" : "red.400", transform: "scale(1.05)" }}
                 transition="all 0.2s"
+                boxShadow={catchmentEditMode === 'remove' ? "0 0 12px rgba(0, 255, 255, 0.6)" : undefined}
               />
             </Tooltip>
           </VStack>

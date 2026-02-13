@@ -10,7 +10,7 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        version = "0.1.0";
+        version = "0.2.0";
 
         # MkDocs environment for requirements documentation
         mkdocsEnv = pkgs.python3.withPackages (ps: with ps; [

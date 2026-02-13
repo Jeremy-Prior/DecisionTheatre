@@ -840,3 +840,177 @@ func (s *GpkgStore) GetCatchmentsByIDs(ids []string) ([]GeoJSONFeature, error) {
 
 	return features, nil
 }
+
+// UnionGeometries performs a union of two GeoJSON geometries using polyclip
+// Returns the resulting geometry, area, and any error
+func (s *GpkgStore) UnionGeometries(geom1, geom2 json.RawMessage) (json.RawMessage, float64, error) {
+	// Parse the first geometry
+	poly1, err := geojsonToPolyclip(geom1)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to parse first geometry: %w", err)
+	}
+
+	// Parse the second geometry
+	poly2, err := geojsonToPolyclip(geom2)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to parse second geometry: %w", err)
+	}
+
+	// Perform union
+	result := poly1.Construct(polyclip.UNION, poly2)
+
+	// Convert back to GeoJSON
+	geojson, err := polyclipToGeojson(result)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to convert result to geojson: %w", err)
+	}
+
+	// Calculate area (approximate using shoelace formula)
+	area := calculatePolygonArea(result)
+
+	return geojson, area, nil
+}
+
+// DifferenceGeometries performs a difference of two GeoJSON geometries using polyclip
+// Returns the resulting geometry (geom1 - geom2), area, and any error
+func (s *GpkgStore) DifferenceGeometries(geom1, geom2 json.RawMessage) (json.RawMessage, float64, error) {
+	// Parse the first geometry
+	poly1, err := geojsonToPolyclip(geom1)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to parse first geometry: %w", err)
+	}
+
+	// Parse the second geometry
+	poly2, err := geojsonToPolyclip(geom2)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to parse second geometry: %w", err)
+	}
+
+	// Perform difference
+	result := poly1.Construct(polyclip.DIFFERENCE, poly2)
+
+	// Convert back to GeoJSON
+	geojson, err := polyclipToGeojson(result)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to convert result to geojson: %w", err)
+	}
+
+	// Calculate area
+	area := calculatePolygonArea(result)
+
+	return geojson, area, nil
+}
+
+// geojsonToPolyclip converts GeoJSON geometry to polyclip polygon
+func geojsonToPolyclip(geom json.RawMessage) (polyclip.Polygon, error) {
+	var g struct {
+		Type        string          `json:"type"`
+		Coordinates json.RawMessage `json:"coordinates"`
+	}
+	if err := json.Unmarshal(geom, &g); err != nil {
+		return nil, err
+	}
+
+	switch g.Type {
+	case "Polygon":
+		var coords [][][]float64
+		if err := json.Unmarshal(g.Coordinates, &coords); err != nil {
+			return nil, err
+		}
+		return coordinatesToPolyclip(coords), nil
+
+	case "MultiPolygon":
+		var multiCoords [][][][]float64
+		if err := json.Unmarshal(g.Coordinates, &multiCoords); err != nil {
+			return nil, err
+		}
+		// Combine all polygons
+		var result polyclip.Polygon
+		for _, coords := range multiCoords {
+			poly := coordinatesToPolyclip(coords)
+			if result == nil {
+				result = poly
+			} else {
+				result = result.Construct(polyclip.UNION, poly)
+			}
+		}
+		return result, nil
+
+	default:
+		return nil, fmt.Errorf("unsupported geometry type: %s", g.Type)
+	}
+}
+
+// coordinatesToPolyclip converts GeoJSON polygon coordinates to polyclip polygon
+func coordinatesToPolyclip(coords [][][]float64) polyclip.Polygon {
+	poly := make(polyclip.Polygon, len(coords))
+	for i, ring := range coords {
+		contour := make(polyclip.Contour, len(ring))
+		for j, pt := range ring {
+			contour[j] = polyclip.Point{X: pt[0], Y: pt[1]}
+		}
+		poly[i] = contour
+	}
+	return poly
+}
+
+// polyclipToGeojson converts polyclip polygon back to GeoJSON
+func polyclipToGeojson(poly polyclip.Polygon) (json.RawMessage, error) {
+	if len(poly) == 0 {
+		// Return empty polygon
+		return json.Marshal(map[string]interface{}{
+			"type":        "Polygon",
+			"coordinates": [][][]float64{},
+		})
+	}
+
+	// Convert to GeoJSON coordinates
+	coords := make([][][]float64, len(poly))
+	for i, contour := range poly {
+		ring := make([][]float64, len(contour))
+		for j, pt := range contour {
+			ring[j] = []float64{pt.X, pt.Y}
+		}
+		// Close the ring if not already closed
+		if len(ring) > 0 && (ring[0][0] != ring[len(ring)-1][0] || ring[0][1] != ring[len(ring)-1][1]) {
+			ring = append(ring, ring[0])
+		}
+		coords[i] = ring
+	}
+
+	return json.Marshal(map[string]interface{}{
+		"type":        "Polygon",
+		"coordinates": coords,
+	})
+}
+
+// calculatePolygonArea calculates the area of a polyclip polygon in square km (approximate)
+func calculatePolygonArea(poly polyclip.Polygon) float64 {
+	if len(poly) == 0 {
+		return 0
+	}
+
+	totalArea := 0.0
+	for i, contour := range poly {
+		area := 0.0
+		n := len(contour)
+		for j := 0; j < n; j++ {
+			k := (j + 1) % n
+			area += contour[j].X * contour[k].Y
+			area -= contour[k].X * contour[j].Y
+		}
+		area = area / 2.0
+
+		// First contour is exterior (positive area), rest are holes (negative)
+		if i == 0 {
+			totalArea += area
+		} else {
+			totalArea -= area // Subtract holes
+		}
+	}
+
+	// Convert from degrees squared to km squared (approximate at equator)
+	// 1 degree ≈ 111 km at equator
+	kmPerDegree := 111.0
+	return totalArea * kmPerDegree * kmPerDegree * -1 // Negative because counter-clockwise
+}

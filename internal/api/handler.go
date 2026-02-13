@@ -76,6 +76,10 @@ func (h *Handler) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/sites/{id}/indicators", h.handleExtractIndicators).Methods("POST")
 	r.HandleFunc("/sites/{id}/indicators", h.handleUpdateIndicators).Methods("PATCH")
 	r.HandleFunc("/sites/{id}/indicators/reset", h.handleResetIdealIndicators).Methods("POST")
+
+	// Site boundary editing (union/difference with catchments)
+	r.HandleFunc("/sites/{id}/boundary/union/{catchmentId}", h.handleBoundaryUnion).Methods("POST")
+	r.HandleFunc("/sites/{id}/boundary/difference/{catchmentId}", h.handleBoundaryDifference).Methods("POST")
 }
 
 // respondJSON sends a JSON response (delegates to httputil)
@@ -733,4 +737,184 @@ func (h *Handler) handleResetIdealIndicators(w http.ResponseWriter, r *http.Requ
 	}
 
 	respondJSON(w, http.StatusOK, updated)
+}
+
+// ============================================================================
+// Site Boundary Editing Handlers (Union/Difference)
+// ============================================================================
+
+// BoundaryOperationResponse returns the updated geometry after union/difference
+type BoundaryOperationResponse struct {
+	Geometry    json.RawMessage    `json:"geometry"`
+	BoundingBox *sites.BoundingBox `json:"boundingBox"`
+	Area        float64            `json:"area"`
+}
+
+// handleBoundaryUnion adds a catchment to the site boundary using geometry union
+func (h *Handler) handleBoundaryUnion(w http.ResponseWriter, r *http.Request) {
+	if h.siteStore == nil {
+		respondError(w, http.StatusInternalServerError, "site store not initialized")
+		return
+	}
+	if h.gpkgStore == nil {
+		respondError(w, http.StatusServiceUnavailable, "geopackage store not available")
+		return
+	}
+
+	vars := mux.Vars(r)
+	siteID := vars["id"]
+	catchmentID := vars["catchmentId"]
+
+	// Get the site
+	site, err := h.siteStore.Get(siteID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	if len(site.Geometry) == 0 {
+		respondError(w, http.StatusBadRequest, "site has no geometry")
+		return
+	}
+
+	// Get catchment geometry
+	features, err := h.gpkgStore.GetCatchmentsByIDs([]string{catchmentID})
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if len(features) == 0 {
+		respondError(w, http.StatusNotFound, "catchment not found")
+		return
+	}
+
+	// Perform union operation using SpatiaLite
+	newGeometry, newArea, err := h.gpkgStore.UnionGeometries(site.Geometry, features[0].Geometry)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "union failed: "+err.Error())
+		return
+	}
+
+	// Update catchment IDs (add the new catchment)
+	catchmentIDStr := catchmentID
+	alreadyExists := false
+	for _, id := range site.CatchmentIDs {
+		if id == catchmentIDStr {
+			alreadyExists = true
+			break
+		}
+	}
+	if !alreadyExists {
+		site.CatchmentIDs = append(site.CatchmentIDs, catchmentIDStr)
+	}
+
+	// Compute new bounding box
+	var bbox *sites.BoundingBox
+	if len(newGeometry) > 0 {
+		var geom map[string]interface{}
+		if err := json.Unmarshal(newGeometry, &geom); err == nil {
+			bbox = &sites.BoundingBox{MinX: 180, MinY: 90, MaxX: -180, MaxY: -90}
+			extractBBoxFromGeom(geom, bbox)
+		}
+	}
+
+	// Update site
+	site.Geometry = newGeometry
+	site.BoundingBox = bbox
+	site.Area = newArea
+
+	updated, err := h.siteStore.Update(siteID, site)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to update site: "+err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, BoundaryOperationResponse{
+		Geometry:    updated.Geometry,
+		BoundingBox: updated.BoundingBox,
+		Area:        updated.Area,
+	})
+}
+
+// handleBoundaryDifference removes a catchment from the site boundary using geometry difference
+func (h *Handler) handleBoundaryDifference(w http.ResponseWriter, r *http.Request) {
+	if h.siteStore == nil {
+		respondError(w, http.StatusInternalServerError, "site store not initialized")
+		return
+	}
+	if h.gpkgStore == nil {
+		respondError(w, http.StatusServiceUnavailable, "geopackage store not available")
+		return
+	}
+
+	vars := mux.Vars(r)
+	siteID := vars["id"]
+	catchmentID := vars["catchmentId"]
+
+	// Get the site
+	site, err := h.siteStore.Get(siteID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	if len(site.Geometry) == 0 {
+		respondError(w, http.StatusBadRequest, "site has no geometry")
+		return
+	}
+
+	// Get catchment geometry
+	features, err := h.gpkgStore.GetCatchmentsByIDs([]string{catchmentID})
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if len(features) == 0 {
+		respondError(w, http.StatusNotFound, "catchment not found")
+		return
+	}
+
+	// Perform difference operation using SpatiaLite
+	newGeometry, newArea, err := h.gpkgStore.DifferenceGeometries(site.Geometry, features[0].Geometry)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "difference failed: "+err.Error())
+		return
+	}
+
+	// Update catchment IDs (remove the catchment)
+	catchmentIDStr := catchmentID
+	newCatchmentIDs := make([]string, 0, len(site.CatchmentIDs))
+	for _, id := range site.CatchmentIDs {
+		if id != catchmentIDStr {
+			newCatchmentIDs = append(newCatchmentIDs, id)
+		}
+	}
+	site.CatchmentIDs = newCatchmentIDs
+
+	// Compute new bounding box
+	var bbox *sites.BoundingBox
+	if len(newGeometry) > 0 {
+		var geom map[string]interface{}
+		if err := json.Unmarshal(newGeometry, &geom); err == nil {
+			bbox = &sites.BoundingBox{MinX: 180, MinY: 90, MaxX: -180, MaxY: -90}
+			extractBBoxFromGeom(geom, bbox)
+		}
+	}
+
+	// Update site
+	site.Geometry = newGeometry
+	site.BoundingBox = bbox
+	site.Area = newArea
+
+	updated, err := h.siteStore.Update(siteID, site)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "failed to update site: "+err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, BoundaryOperationResponse{
+		Geometry:    updated.Geometry,
+		BoundingBox: updated.BoundingBox,
+		Area:        updated.Area,
+	})
 }
