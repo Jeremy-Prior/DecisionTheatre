@@ -155,16 +155,19 @@ function SiteCreationMap({
       // Add a transparent fill layer for catchment selection (clickable area)
       // This must be added after the base style loads
       if (!map.getLayer('catchments-selectable-fill')) {
+        // Check if the Catchments Outlines layer exists in the style
+        const beforeLayer = map.getLayer('Catchments Outlines') ? 'Catchments Outlines' : undefined;
         map.addLayer({
           id: 'catchments-selectable-fill',
           type: 'fill',
           source: 'UoW Tiles',
           'source-layer': 'catchments_lev12',
+          minzoom: 8,
           paint: {
             'fill-color': 'transparent',
             'fill-opacity': 0,
           },
-        }, 'Catchments Outlines'); // Insert below the outlines
+        }, beforeLayer); // Insert below the outlines if layer exists
       }
 
       // If we have initial geometry, display it
