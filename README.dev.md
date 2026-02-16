@@ -94,9 +94,11 @@ The application requires two data files: map tiles (MBTiles) and scenario data (
 Convert a GeoPackage with vector layers to MBTiles:
 
 ```bash
-cd data/mbtiles
-./gpkg_to_mbtiles.sh UoW_layers.gpkg catchments.mbtiles
+cd resources/mbtiles
+./gpkg_to_mbtiles.sh UoW_layers.gpkg
 ```
+
+The output is automatically placed in `data/mbtiles/africa.mbtiles`.
 
 ### Scenario Datapack
 

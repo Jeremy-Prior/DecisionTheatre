@@ -50,8 +50,8 @@ if [ ! -d "$PROJECT_ROOT/data/mbtiles" ]; then
     exit 1
 fi
 
-if [ ! -f "$PROJECT_ROOT/data/mbtiles/catchments.mbtiles" ]; then
-    echo "ERROR: data/mbtiles/catchments.mbtiles not found" >&2
+if [ ! -f "$PROJECT_ROOT/data/mbtiles/africa.mbtiles" ]; then
+    echo "ERROR: data/mbtiles/africa.mbtiles not found" >&2
     exit 1
 fi
 
@@ -75,8 +75,8 @@ fi
 
 # Copy mbtiles and style JSON (exclude build scripts and source gpkg)
 echo "==> Bundling MBTiles and styles..."
-cp "$PROJECT_ROOT/data/mbtiles/catchments.mbtiles" "$PACK_DIR/data/mbtiles/"
-echo "    catchments.mbtiles ($(du -h "$PACK_DIR/data/mbtiles/catchments.mbtiles" | cut -f1))"
+cp "$PROJECT_ROOT/data/mbtiles/africa.mbtiles" "$PACK_DIR/data/mbtiles/"
+echo "    africa.mbtiles ($(du -h "$PACK_DIR/data/mbtiles/africa.mbtiles" | cut -f1))"
 
 if [ -f "$PROJECT_ROOT/data/mbtiles/style.json" ]; then
     cp "$PROJECT_ROOT/data/mbtiles/style.json" "$PACK_DIR/data/mbtiles/"

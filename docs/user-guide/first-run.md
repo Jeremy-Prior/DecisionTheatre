@@ -5,7 +5,7 @@ This tutorial walks through launching Decision Theatre for the first time.
 ## Prerequisites
 
 - The `decision-theatre` binary (see [Installation](../user-manual/installation.md))
-- `catchments.mbtiles` in the `data/mbtiles/` directory (see [Data Setup](../user-manual/data-setup.md))
+- `africa.mbtiles` in the `data/mbtiles/` directory (see [Data Setup](../user-manual/data-setup.md))
 
 ## Steps
 

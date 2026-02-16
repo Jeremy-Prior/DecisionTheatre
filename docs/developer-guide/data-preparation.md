@@ -19,12 +19,14 @@ The map data originates from a GeoPackage file (`UoW_layers.gpkg`) containing:
 
 ### Conversion Pipeline
 
-The script `data/mbtiles/gpkg_to_mbtiles.sh` automates the full conversion:
+The script `resources/mbtiles/gpkg_to_mbtiles.sh` automates the full conversion:
 
 ```bash
-cd data/mbtiles
-./gpkg_to_mbtiles.sh UoW_layers.gpkg catchments.mbtiles
+cd resources/mbtiles
+./gpkg_to_mbtiles.sh UoW_layers.gpkg
 ```
+
+The script stages output in `resources/mbtiles/` during processing, then moves the final `africa.mbtiles` to `data/mbtiles/` on completion.
 
 **Pipeline stages:**
 

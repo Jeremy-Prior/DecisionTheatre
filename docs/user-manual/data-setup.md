@@ -40,7 +40,7 @@ decision-theatre-data-v1.0.0.zip
 ├── manifest.json
 └── data/
     ├── mbtiles/
-    │   ├── catchments.mbtiles # vector tile data (required)
+    │   ├── africa.mbtiles     # vector tile data (required)
     │   └── style.json         # MapBox style (required)
     └── *.geoparquet           # scenario data (optional)
 ```
@@ -86,8 +86,8 @@ The source data must be prepared first:
 
 ```bash
 nix develop
-cd data/mbtiles
-./gpkg_to_mbtiles.sh UoW_layers.gpkg catchments.mbtiles
+cd resources/mbtiles
+./gpkg_to_mbtiles.sh UoW_layers.gpkg
 ```
 
 3. Optionally add GeoParquet scenario files to `data/`
