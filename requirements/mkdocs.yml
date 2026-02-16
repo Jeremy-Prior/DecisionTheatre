@@ -37,7 +37,6 @@ nav:
     - REQ-005 Map Swiper Comparison: requirements/REQ-005-map-swiper.md
     - REQ-006 MBTiles Tile Serving: requirements/REQ-006-mbtiles-serving.md
     - REQ-007 Catchment Vector Data: requirements/REQ-007-catchment-data.md
-    - REQ-008 GeoParquet Data Loading: requirements/REQ-008-geoparquet-loading.md
     - REQ-009 Scenario Selection Panel: requirements/REQ-009-scenario-panel.md
     - REQ-010 Factor Selection: requirements/REQ-010-factor-selection.md
     - REQ-011 Dynamic Map Update: requirements/REQ-011-dynamic-map-update.md

@@ -97,10 +97,6 @@ function SetupGuide({ info }: SetupGuideProps) {
                 label="Map tiles (MBTiles)"
                 ready={info.tiles_loaded}
               />
-              <StatusRow
-                label="Scenario data (GeoParquet)"
-                ready={info.geo_loaded}
-              />
             </VStack>
           </Box>
 
@@ -196,7 +192,7 @@ nix run`}</Code>
     mbtiles/
       africa.mbtiles        <- vector tile data (required)
       style.json            <- MapBox style (required)
-    *.geoparquet            <- scenario data (optional)`}</Code>
+    datapack.gpkg           <- scenario data (optional)`}</Code>
           </Box>
 
           <Text color="gray.500" fontSize="xs" textAlign="center" mt={4}>

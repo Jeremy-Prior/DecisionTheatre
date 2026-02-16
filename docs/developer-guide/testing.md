@@ -18,7 +18,7 @@ Go tests use the standard `testing` package. Test files are colocated with sourc
 
 ```
 internal/api/handler_test.go
-internal/geodata/geoparquet_test.go
+internal/geodata/gpkg_store_test.go
 internal/nn/model_test.go
 internal/tiles/mbtiles_test.go
 ```

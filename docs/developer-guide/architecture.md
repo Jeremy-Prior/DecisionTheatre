@@ -16,7 +16,7 @@ graph TB
         SRV --> TILES[MBTiles tile server]
         SRV --> STATIC[Embedded SPA]
         SRV --> IMAGES[Image server]
-        API --> GEO[GeoParquet loader]
+        API --> GEO[GeoPackage store]
         API --> PROJ[Project store]
     end
 
@@ -51,18 +51,16 @@ graph TB
 5. Project data is loaded/saved via REST endpoints under `/api/projects/`
 6. MapLibre GL JS requests vector tiles from `/tiles/{z}/{x}/{y}.pbf`
 7. The React app calls REST endpoints under `/api/` for scenario data and server info
-8. GeoArrow files are loaded for choropleth rendering via `/data/*.geoarrow`
-9. All data is read from local files (MBTiles, GeoParquet, GeoArrow, project JSON files)
+8. Choropleth data is queried from the GeoPackage via REST endpoints
+9. All data is read from local files (MBTiles, GeoPackage, site JSON files)
 
 ## Map Rendering Architecture
 
 The map uses a layered rendering approach:
 
 - **Base layers** (MapLibre GL JS): Ecoregions, countries, rivers, lakes, catchment outlines - served from MBTiles
-- **Choropleth layer** (deck.gl): Dynamic polygon fills from GeoArrow data with indicator-based coloring
+- **Choropleth layer** (deck.gl): Dynamic polygon fills from GeoPackage data with indicator-based coloring
 - **3D extrusion** (optional): Catchments can be extruded based on indicator values
-
-See [GeoArrow Rendering](geoarrow-rendering.md) for detailed documentation on the choropleth rendering architecture.
 
 ## Package Layout
 
@@ -75,7 +73,7 @@ See [GeoArrow Rendering](geoarrow-rendering.md) for detailed documentation on th
 │   ├── config/
 │   │   └── config.go          # Configuration struct
 │   ├── geodata/
-│   │   └── geoparquet.go      # GeoParquet file loading
+│   │   └── gpkg_store.go      # GeoPackage data access
 │   ├── models/
 │   │   └── models.go          # Shared data models
 │   ├── projects/

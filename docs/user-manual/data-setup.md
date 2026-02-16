@@ -42,7 +42,7 @@ decision-theatre-data-v1.0.0.zip
     ├── mbtiles/
     │   ├── africa.mbtiles     # vector tile data (required)
     │   └── style.json         # MapBox style (required)
-    └── *.geoparquet           # scenario data (optional)
+    └── datapack.gpkg          # scenario data GeoPackage (optional)
 ```
 
 ### manifest.json
@@ -90,7 +90,7 @@ cd resources/mbtiles
 ./gpkg_to_mbtiles.sh UoW_layers.gpkg
 ```
 
-3. Optionally add GeoParquet scenario files to `data/`
+3. Optionally add the GeoPackage datapack (`datapack.gpkg`) to `data/`
 4. Run `make datapack`
 
 ## Required: Map Tiles (MBTiles)
@@ -108,16 +108,14 @@ The application needs a vector MBTiles file containing African catchment boundar
 | `catchments_lev12` | 8 | 15 |
 | `ne_10m_populated_places` | 6 | 15 |
 
-## Optional: Scenario Data (GeoParquet)
+## Optional: Scenario Data (GeoPackage)
 
-To enable scenario comparison, include GeoParquet files in the data pack's `data/` directory:
+To enable scenario comparison and choropleth rendering, include the GeoPackage datapack in the data pack's `data/` directory:
 
 ```
 data/
-  past.geoparquet
-  present.geoparquet
-  future.geoparquet
+  datapack.gpkg
 ```
 
-Each file should contain catchment geometries with attribute columns representing the factors available for comparison.
+The GeoPackage should contain scenario tables (`scenario_current`, `scenario_reference`) with catchment IDs and attribute columns representing the factors available for comparison.
 

@@ -2,13 +2,12 @@
   "version": 8,
   "name": "UoW Tiles",
   "metadata": {"maputnik:renderer": "mbgljs"},
-  "center": [2.2, 30.76],
-  "zoom": 2,
+  "center": [32.7, 4.65],
+  "zoom": 2.75,
   "sources": {
     "UoW Tiles": {
       "type": "vector",
-      "url": "http://localhost:8080/data/tiles.json",
-      "promoteId": {"catchments_lev12": "HYBAS_ID"}
+      "url": "http://localhost:8080/data/tiles.json"
     }
   },
   "sprite": "",
@@ -19,7 +18,7 @@
       "type": "fill",
       "source": "UoW Tiles",
       "source-layer": "ne_african_countries",
-      "maxzoom": 10,
+      "maxzoom": 8,
       "layout": {"visibility": "visible"},
       "paint": {
         "fill-opacity": 0.2,
@@ -187,6 +186,33 @@
       "paint": {"line-color": "rgba(32, 111, 22, 1)"}
     },
     {
+      "id": "Protected Areas Marine",
+      "type": "fill",
+      "source": "UoW Tiles",
+      "source-layer": "WDPA_Feb2026_Public",
+      "filter": ["all", ["==", "REALM", "Marine"]],
+      "layout": {"visibility": "visible"},
+      "paint": {"fill-color": "rgba(66, 145, 203, 1)"}
+    },
+    {
+      "id": "Protected Areas Coastal",
+      "type": "fill",
+      "source": "UoW Tiles",
+      "source-layer": "WDPA_Feb2026_Public",
+      "filter": ["all", ["==", "REALM", "Coastal"]],
+      "layout": {"visibility": "visible"},
+      "paint": {"fill-color": "rgba(66, 200, 203, 1)"}
+    },
+    {
+      "id": "Protected Areas Terrestrial",
+      "type": "fill",
+      "source": "UoW Tiles",
+      "source-layer": "WDPA_Feb2026_Public",
+      "filter": ["all", ["==", "REALM", "Terrestrial"]],
+      "layout": {"visibility": "visible"},
+      "paint": {"fill-color": "rgba(5, 82, 20, 1)"}
+    },
+    {
       "id": "Rivers",
       "type": "line",
       "source": "UoW Tiles",
@@ -198,6 +224,91 @@
       }
     },
     {
+      "id": "Roads - Tertiary",
+      "type": "line",
+      "source": "UoW Tiles",
+      "source-layer": "Africa_Roads_Primary-Tertiary",
+      "minzoom": 9,
+      "filter": [
+        "any",
+        ["==", "fclass", "tertiary"],
+        ["==", "fclass", "tertiary_link"]
+      ],
+      "layout": {
+        "visibility": "visible",
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-width": {"stops": [[6, 0.5], [12, 1.5]]},
+        "line-color": "rgba(166, 166, 166, 1)"
+      }
+    },
+    {
+      "id": "Roads - Secondary",
+      "type": "line",
+      "source": "UoW Tiles",
+      "source-layer": "Africa_Roads_Primary-Tertiary",
+      "minzoom": 8,
+      "filter": [
+        "any",
+        ["==", "fclass", "secondary"],
+        ["==", "fclass", "secondary_link"]
+      ],
+      "layout": {
+        "visibility": "visible",
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-width": {"stops": [[6, 0.5], [12, 1.5]]},
+        "line-color": "rgba(255, 245, 84, 1)"
+      }
+    },
+    {
+      "id": "Roads - Primary",
+      "type": "line",
+      "source": "UoW Tiles",
+      "source-layer": "Africa_Roads_Primary-Tertiary",
+      "minzoom": 7,
+      "filter": [
+        "any",
+        ["==", "fclass", "primary"],
+        ["==", "fclass", "primary_link"]
+      ],
+      "layout": {
+        "visibility": "visible",
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-width": {"stops": [[6, 0.75], [12, 2]]},
+        "line-color": "rgba(230, 155, 60, 1)"
+      }
+    },
+    {
+      "id": "Roads - Motorway/Trunk",
+      "type": "line",
+      "source": "UoW Tiles",
+      "source-layer": "Africa_Roads_Primary-Tertiary",
+      "filter": [
+        "any",
+        ["==", "fclass", "motorway"],
+        ["==", "fclass", "motorway_link"],
+        ["==", "fclass", "trunk"],
+        ["==", "fclass", "trunk_link"]
+      ],
+      "layout": {
+        "visibility": "visible",
+        "line-cap": "round",
+        "line-join": "round"
+      },
+      "paint": {
+        "line-width": {"stops": [[6, 1], [12, 3]]},
+        "line-color": "rgba(240, 114, 114, 1)"
+      }
+    },
+    {
       "id": "Large Waterbodies",
       "type": "fill",
       "source": "UoW Tiles",
@@ -205,14 +316,6 @@
       "filter": ["all"],
       "layout": {"visibility": "visible"},
       "paint": {"fill-color": "rgba(91, 152, 218, 1)"}
-    },
-    {
-      "id": "Catchments Outlines",
-      "type": "line",
-      "source": "UoW Tiles",
-      "source-layer": "catchments_lev12",
-      "layout": {"visibility": "visible"},
-      "paint": {"line-color": "rgba(173, 110, 0, 1)", "line-width": 2}
     },
     {
       "id": "Populated Place Admin-0 capital",
@@ -258,6 +361,24 @@
       "filter": ["all", ["==", "FEATURECLA", "Populated place"]],
       "layout": {"visibility": "visible"},
       "paint": {"circle-color": "rgba(0, 0, 0, 1)"}
+    },
+    {
+      "id": "Populated Place Labels",
+      "type": "symbol",
+      "source": "UoW Tiles",
+      "source-layer": "ne_10m_populated_places",
+      "filter": ["all"],
+      "layout": {
+        "text-field": "{NAME}",
+        "text-anchor": "center",
+        "text-offset": [0, -1],
+        "text-font": ["Arial Unicode MS Regular"]
+      },
+      "paint": {
+        "text-halo-width": 0.7,
+        "text-halo-color": "rgba(0, 0, 0, 1)",
+        "text-color": "rgba(255, 255, 255, 1)"
+      }
     }
   ],
   "id": "903to775d"

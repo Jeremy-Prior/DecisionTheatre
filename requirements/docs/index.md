@@ -17,9 +17,9 @@ The application enables decision-makers, researchers, and environmental scientis
 
 The system encompasses:
 
-- **Backend**: Go application with embedded HTTP server, vector tile serving, geoparquet data access, and AI inference (LLM via llama.cpp, neural network via Gorgonia)
+- **Backend**: Go application with embedded HTTP server, vector tile serving, GeoPackage data access, and AI inference (LLM via llama.cpp, neural network via Gorgonia)
 - **Frontend**: React single-page application with Chakra UI styling and MapLibre GL JS map rendering
-- **Data**: MBTiles vector tile storage for basemap and catchment geometries, GeoParquet files for attribute data
+- **Data**: MBTiles vector tile storage for basemap and catchment geometries, GeoPackage for attribute data
 - **Deployment**: Single self-contained binary with all web assets embedded, targeting Windows, macOS, and Linux
 
 ## Stakeholders
@@ -40,7 +40,7 @@ The system encompasses:
 | CSS Framework | Chakra UI v2 |
 | Map Library | MapLibre GL JS |
 | Tile Storage | MBTiles (SQLite) |
-| Data Format | GeoParquet |
+| Data Format | GeoPackage |
 | LLM Engine | llama.cpp (via CGO) |
 | Neural Network | Gorgonia |
 | Build System | Nix Flake (primary), Make (dev convenience) |

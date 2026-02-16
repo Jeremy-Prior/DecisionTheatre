@@ -24,7 +24,7 @@ Returns the current server status and available features.
 |-------|------|-------------|
 | `version` | string | Application version |
 | `tiles_loaded` | boolean | Whether MBTiles data was found and opened |
-| `geo_loaded` | boolean | Whether GeoParquet scenario data is available |
+| `geo_loaded` | boolean | Whether GeoPackage scenario data is available |
 | `scenarios` | string[] | List of available scenario names |
 | `attributes` | string[] | List of available catchment attributes |
 

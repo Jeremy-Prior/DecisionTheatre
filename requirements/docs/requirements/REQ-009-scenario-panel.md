@@ -31,7 +31,7 @@ Panel Closed:                    Panel Open:
 - Panel contains three selection controls:
   1. Left scenario selector (Past / Present / Ideal Future)
   2. Right scenario selector (Past / Present / Ideal Future)
-  3. Factor/attribute selector (populated from geoparquet columns)
+  3. Factor/attribute selector (populated from GeoPackage columns)
 - Each selector shows its scenario description below the dropdown
 - Visual badges distinguish LEFT (orange) and RIGHT (blue) sides
 - Smooth CSS transition on map resize (0.3s cubic-bezier)

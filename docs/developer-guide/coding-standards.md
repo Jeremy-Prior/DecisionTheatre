@@ -35,7 +35,7 @@ golangci-lint run --timeout 5m
 internal/
   api/       # HTTP handlers (thin layer, delegates to domain packages)
   config/    # Configuration structs
-  geodata/   # GeoParquet loading and processing
+  geodata/   # GeoPackage data access and processing
   models/    # Shared data models
   projects/  # Project CRUD operations
   server/    # HTTP server setup, static file serving

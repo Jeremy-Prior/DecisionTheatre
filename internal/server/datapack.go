@@ -146,9 +146,9 @@ func (s *Server) reloadDataStores(packDir string) {
 		s.tileStore.Close()
 		s.tileStore = nil
 	}
-	if s.geoStore != nil {
-		s.geoStore.Close()
-		s.geoStore = nil
+	if s.gpkgStore != nil {
+		s.gpkgStore.Close()
+		s.gpkgStore = nil
 	}
 
 	// Reinitialize
@@ -160,11 +160,11 @@ func (s *Server) reloadDataStores(packDir string) {
 		s.tileStore = tileStore
 	}
 
-	geoStore, err := geodata.NewGeoParquetStore(dataDir)
+	gpkgStore, err := geodata.NewGpkgStore(dataDir)
 	if err != nil {
-		log.Printf("Warning: GeoParquet store not available after reload: %v", err)
+		log.Printf("Warning: GeoPackage store not available after reload: %v", err)
 	} else {
-		s.geoStore = geoStore
+		s.gpkgStore = gpkgStore
 	}
 
 	// Update config for style JSON serving

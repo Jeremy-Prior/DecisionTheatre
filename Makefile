@@ -25,13 +25,13 @@ GO := go
 GOFMT := gofmt
 GOLINT := golangci-lint
 
-.PHONY: all build build-backend build-frontend clean
+.PHONY: all app build build-backend build-frontend clean
 .PHONY: dev dev-backend dev-frontend dev-all
 .PHONY: test test-frontend test-all
 .PHONY: fmt lint check deps
 .PHONY: docs docs-serve
 .PHONY: packages packages-linux packages-windows packages-darwin packages-flatpak packages-snap
-.PHONY: csv2parquet geopackage datapack list-datapack
+.PHONY: geopackage datapack list-datapack
 .PHONY: design-export design-import design-preview
 .PHONY: release
 .PHONY: help info
@@ -41,6 +41,13 @@ all: test build
 # ============================
 # Build (dev iteration)
 # ============================
+
+# Full app build: frontend, docs, and Go binary (everything needed to run)
+# Works with system webkit2gtk-4.0 or webkit2gtk-4.1 (auto-creates compat shim)
+app: build-frontend build-docs
+	./scripts/build-app.sh
+	@echo ""
+	@echo "Build complete! Binary at: bin/decision-theatre"
 
 # Full build: frontend, docs, then backend
 build: build-frontend build-docs build-backend
@@ -177,16 +184,12 @@ release: build-frontend build-docs
 # Data conversion & packing
 # ============================
 
-# Convert CSV data files to Parquet (requires pyarrow from nix develop)
-csv2parquet:
-	python3 scripts/csv2parquet.py --data-dir ./data
-
 # Build datapack.gpkg from CSVs and catchment geometries
 # Creates scenario tables, domain min/max tables, spatial indexes
 geopackage:
 	./scripts/build-geopackage.sh ./data
 
-# Package data files into distributable .zip (parquet + mbtiles)
+# Package data files into distributable .zip (mbtiles + geopackage)
 datapack:
 	./scripts/package-data.sh $(VERSION)
 
@@ -264,7 +267,8 @@ help:
 	@echo "Decision Theatre - Makefile (dev iteration inside nix develop)"
 	@echo ""
 	@echo "Build:"
-	@echo "  build           Frontend + backend (dev)"
+	@echo "  app             Full app build (frontend + docs + backend)"
+	@echo "  build           Same as app"
 	@echo "  build-backend   Backend only"
 	@echo "  build-frontend  Frontend only"
 	@echo "  clean           Remove artifacts"
@@ -294,7 +298,6 @@ help:
 	@echo ""
 	@echo "Data Preparation:"
 	@echo "  geopackage        Build datapack.gpkg from CSVs + catchments"
-	@echo "  csv2parquet       Convert CSV data files to Parquet"
 	@echo "  datapack          Package data into distributable .zip"
 	@echo "  list-datapack     List contents of last built data pack"
 	@echo ""

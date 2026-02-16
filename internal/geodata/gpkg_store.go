@@ -111,6 +111,86 @@ func (s *GpkgStore) GetColumns() []string {
 	return s.columns
 }
 
+// GetScenarios returns available scenarios
+func (s *GpkgStore) GetScenarios() []string {
+	return []string{"current", "reference"}
+}
+
+// GetScenarioData returns data for a scenario and attribute as a map of catchment ID to value
+func (s *GpkgStore) GetScenarioData(scenario, attribute string) (map[string]float64, error) {
+	tableName := "scenario_current"
+	if scenario == "reference" {
+		tableName = "scenario_reference"
+	}
+
+	if !s.isValidColumn(attribute) {
+		return nil, fmt.Errorf("invalid attribute: %s", attribute)
+	}
+
+	query := fmt.Sprintf(`SELECT catchment_id, "%s" FROM %s WHERE "%s" IS NOT NULL`,
+		attribute, tableName, attribute)
+
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query scenario data: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]float64)
+	for rows.Next() {
+		var catchmentID string
+		var value float64
+		if err := rows.Scan(&catchmentID, &value); err != nil {
+			continue
+		}
+		result[catchmentID] = value
+	}
+
+	return result, nil
+}
+
+// GetComparisonData returns comparison data for two scenarios for a given attribute
+func (s *GpkgStore) GetComparisonData(left, right, attribute string) (map[string][2]float64, error) {
+	if !s.isValidColumn(attribute) {
+		return nil, fmt.Errorf("invalid attribute: %s", attribute)
+	}
+
+	leftTable := "scenario_current"
+	if left == "reference" {
+		leftTable = "scenario_reference"
+	}
+
+	rightTable := "scenario_current"
+	if right == "reference" {
+		rightTable = "scenario_reference"
+	}
+
+	query := fmt.Sprintf(`
+		SELECT l.catchment_id, l."%s", r."%s"
+		FROM %s l
+		JOIN %s r ON l.catchment_id = r.catchment_id
+		WHERE l."%s" IS NOT NULL AND r."%s" IS NOT NULL`,
+		attribute, attribute, leftTable, rightTable, attribute, attribute)
+
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query comparison data: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string][2]float64)
+	for rows.Next() {
+		var catchmentID string
+		var leftVal, rightVal float64
+		if err := rows.Scan(&catchmentID, &leftVal, &rightVal); err != nil {
+			continue
+		}
+		result[catchmentID] = [2]float64{leftVal, rightVal}
+	}
+
+	return result, nil
+}
+
 // QueryCatchments returns catchments within a bounding box with a specific attribute
 func (s *GpkgStore) QueryCatchments(scenario, attribute string, minx, miny, maxx, maxy float64) (*FeatureCollection, error) {
 	// Validate scenario

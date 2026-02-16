@@ -145,13 +145,3 @@ The build script normalizes column names to ensure consistency between tables:
 - `python3`
 
 All are available in the Nix dev shell (`nix develop`).
-
-## Legacy: CSV to Parquet
-
-For historical reference, there was a previous approach using Parquet files:
-
-```bash
-make csv2parquet
-```
-
-This converted CSVs to Parquet using PyArrow. The current GeoPackage-based approach is preferred as it consolidates all data into a single file with proper spatial indexing.

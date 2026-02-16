@@ -21,7 +21,7 @@ import (
 	"github.com/kartoza/decision-theatre/internal/tiles"
 )
 
-//go:embed static/*
+//go:embed all:static
 var staticFS embed.FS
 
 //go:embed all:docs_site/*
@@ -33,7 +33,6 @@ type Server struct {
 	httpServer *http.Server
 	router     *mux.Router
 	tileStore  *tiles.MBTilesStore
-	geoStore   *geodata.GeoParquetStore
 	gpkgStore  *geodata.GpkgStore
 	siteStore  *sites.Store
 }
@@ -54,18 +53,10 @@ func New(cfg config.Config) (*Server, error) {
 		s.tileStore = tileStore
 	}
 
-	// Initialize GeoParquet store asynchronously
-	geoStore, err := geodata.NewGeoParquetStore(cfg.DataDir)
-	if err != nil {
-		log.Printf("Warning: GeoParquet store not available: %v", err)
-	} else {
-		s.geoStore = geoStore
-	}
-
-	// Initialize Geopackage store for choropleth queries
+	// Initialize GeoPackage store for scenario data and choropleth queries
 	gpkgStore, err := geodata.NewGpkgStore(cfg.DataDir)
 	if err != nil {
-		log.Printf("Warning: Geopackage store not available: %v", err)
+		log.Printf("Warning: GeoPackage store not available: %v", err)
 	} else {
 		s.gpkgStore = gpkgStore
 	}
@@ -88,7 +79,7 @@ func New(cfg config.Config) (*Server, error) {
 func (s *Server) setupRoutes() {
 	// API routes
 	apiRouter := s.router.PathPrefix("/api").Subrouter()
-	apiHandler := api.NewHandler(s.tileStore, s.geoStore, s.gpkgStore, s.siteStore, s.cfg)
+	apiHandler := api.NewHandler(s.tileStore, s.gpkgStore, s.siteStore, s.cfg)
 	apiHandler.RegisterRoutes(apiRouter)
 
 	// Data pack management routes
@@ -109,9 +100,6 @@ func (s *Server) setupRoutes() {
 	imagesDir := filepath.Join(s.cfg.DataDir, "images")
 	s.router.PathPrefix("/data/images/").Handler(
 		http.StripPrefix("/data/images/", http.FileServer(http.Dir(imagesDir))))
-
-	// Serve GeoArrow (Arrow IPC) files from data directory
-	s.router.HandleFunc("/data/{scenario}.arrow", s.handleGeoArrowFile).Methods("GET")
 
 	// Embedded documentation site (MkDocs build output)
 	docsContent, err := fs.Sub(docsFS, "docs_site")
@@ -180,9 +168,6 @@ func (s *Server) Stop() error {
 	if s.tileStore != nil {
 		s.tileStore.Close()
 	}
-	if s.geoStore != nil {
-		s.geoStore.Close()
-	}
 	if s.gpkgStore != nil {
 		s.gpkgStore.Close()
 	}
@@ -227,30 +212,6 @@ func (s *Server) handleStyleJSON(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(style)
 }
 
-// handleGeoArrowFile serves Arrow IPC files with native GeoArrow geometry for choropleth rendering
-func (s *Server) handleGeoArrowFile(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	scenario := vars["scenario"]
-
-	// Validate scenario name to prevent path traversal
-	if scenario != "current" && scenario != "reference" {
-		http.Error(w, "Invalid scenario", http.StatusBadRequest)
-		return
-	}
-
-	filePath := filepath.Join(s.cfg.DataDir, scenario+".arrow")
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		http.Error(w, "Arrow file not found", http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/vnd.apache.arrow.file")
-	w.Header().Set("Cache-Control", "public, max-age=86400")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	http.ServeFile(w, r, filePath)
-}
-
 // handleTileJSON serves TileJSON metadata for the catchments tileset
 func (s *Server) handleTileJSON(w http.ResponseWriter, r *http.Request) {
 	scheme := "http"
@@ -261,9 +222,9 @@ func (s *Server) handleTileJSON(w http.ResponseWriter, r *http.Request) {
 
 	tileJSON := map[string]interface{}{
 		"tilejson": "2.2.0",
-		"name":     "catchments",
+		"name":     "africa",
 		"scheme":   "xyz",
-		"tiles":    []string{baseURL + "/tiles/catchments/{z}/{x}/{y}.pbf"},
+		"tiles":    []string{baseURL + "/tiles/africa/{z}/{x}/{y}.pbf"},
 		"minzoom":  2,
 		"maxzoom":  15,
 		"bounds":   []float64{-17.546539, -34.837477, 63.500977, 37.352693},
@@ -272,7 +233,7 @@ func (s *Server) handleTileJSON(w http.ResponseWriter, r *http.Request) {
 
 	// Add vector_layers from mbtiles metadata if available
 	if s.tileStore != nil {
-		meta, err := s.tileStore.GetMetadata("catchments")
+		meta, err := s.tileStore.GetMetadata("africa")
 		if err == nil && meta.JSON != "" {
 			var metaJSON map[string]interface{}
 			if json.Unmarshal([]byte(meta.JSON), &metaJSON) == nil {

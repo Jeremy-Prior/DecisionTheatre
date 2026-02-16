@@ -32,7 +32,7 @@ Test Hierarchy:
 - **Go tests**: `go test -v -race -coverprofile=coverage.out ./...`
   - Race detection enabled
   - Coverage output in standard Go format
-  - Unit tests for: MBTiles store, GeoParquet store, API handlers, Neural network
+  - Unit tests for: MBTiles store, GeoPackage store, API handlers, Neural network
   - Test fixtures created in temporary directories (`t.TempDir()`)
   - Table-driven tests for edge cases
 - **React tests**: Vitest with React Testing Library
@@ -49,7 +49,7 @@ Test Hierarchy:
 ### Key Files
 
 - `internal/tiles/mbtiles_test.go`
-- `internal/geodata/geoparquet_test.go`
+- `internal/geodata/gpkg_store_test.go`
 - `internal/api/handler_test.go`
 - `internal/nn/model_test.go`
 - `frontend/src/test/` - Frontend tests

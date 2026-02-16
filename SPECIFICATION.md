@@ -257,7 +257,7 @@ Violet → Indigo → Blue → Cyan → Green → Yellow → Orange → Red
 - Viewport-limited choropleth queries (max 2000 features)
 - Pre-computed geojson column in GeoPackage
 - R-tree spatial index for fast bbox queries
-- Lazy loading of Arrow/Parquet files
+- Efficient SQLite queries via GeoPackage
 
 ---
 
@@ -279,7 +279,7 @@ Violet → Indigo → Blue → Cyan → Green → Yellow → Orange → Red
 ### Backend Packages (`internal/`)
 - **api**: HTTP handlers for REST endpoints
 - **config**: Application configuration and settings persistence
-- **geodata**: GeoPackage and GeoParquet data access
+- **geodata**: GeoPackage data access
 - **httputil**: Shared HTTP response utilities
 - **server**: HTTP server setup and routing
 - **sites**: Site CRUD operations and JSON persistence

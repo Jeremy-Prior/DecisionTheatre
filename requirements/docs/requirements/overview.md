@@ -17,7 +17,7 @@ Every requirement in this document follows a consistent template:
 
 - **Frontend**: React UI, Chakra UI components, MapLibre map, user interactions
 - **Backend**: Go HTTP server, API endpoints, data serving
-- **Data**: MBTiles, GeoParquet, vector tiles, catchment attributes
+- **Data**: MBTiles, GeoPackage, vector tiles, catchment attributes
 - **AI/ML**: Embedded LLM (llama.cpp), neural network (Gorgonia)
 - **Infrastructure**: Build system, packaging, testing, deployment
 

@@ -44,5 +44,5 @@
 | Format | Purpose | Specification |
 |--------|---------|---------------|
 | MBTiles | Vector tile storage | [MBTiles Spec](https://github.com/mapbox/mbtiles-spec) |
-| GeoParquet | Scenario attribute data | [GeoParquet Spec](https://geoparquet.org/) |
+| GeoPackage | Scenario attribute data | [GeoPackage Spec](https://www.geopackage.org/) |
 | MapBox GL Style | Map styling | [Style Spec](https://docs.mapbox.com/style-spec/) |

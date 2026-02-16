@@ -105,7 +105,7 @@ nix run github:kartoza/DecisionTheatre
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--port` | `8080` | HTTP server port |
-| `--data-dir` | *(auto)* | Directory containing GeoParquet scenario files |
+| `--data-dir` | *(auto)* | Directory containing data files (mbtiles, geopackage) |
 | `--resources-dir` | *(auto)* | Directory containing MBTiles and style files |
 | `--headless` | `false` | Run without a desktop window |
 | `--version` | | Print version and exit |

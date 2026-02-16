@@ -18,7 +18,6 @@ import (
 // Handler provides HTTP API endpoints
 type Handler struct {
 	tileStore *tiles.MBTilesStore
-	geoStore  *geodata.GeoParquetStore
 	gpkgStore *geodata.GpkgStore
 	siteStore *sites.Store
 	cfg       config.Config
@@ -27,14 +26,12 @@ type Handler struct {
 // NewHandler creates a new API handler
 func NewHandler(
 	tileStore *tiles.MBTilesStore,
-	geoStore *geodata.GeoParquetStore,
 	gpkgStore *geodata.GpkgStore,
 	siteStore *sites.Store,
 	cfg config.Config,
 ) *Handler {
 	return &Handler{
 		tileStore: tileStore,
-		geoStore:  geoStore,
 		gpkgStore: gpkgStore,
 		siteStore: siteStore,
 		cfg:       cfg,
@@ -102,7 +99,7 @@ func (h *Handler) handleInfo(w http.ResponseWriter, r *http.Request) {
 	info := map[string]interface{}{
 		"version":      h.cfg.Version,
 		"tiles_loaded": h.tileStore != nil,
-		"geo_loaded":   h.geoStore != nil,
+		"geo_loaded":   h.gpkgStore != nil,
 	}
 	respondJSON(w, http.StatusOK, info)
 }
@@ -134,23 +131,17 @@ func (h *Handler) handleTilesetMetadata(w http.ResponseWriter, r *http.Request) 
 
 // handleListScenarios returns available scenarios
 func (h *Handler) handleListScenarios(w http.ResponseWriter, r *http.Request) {
-	if h.geoStore == nil {
+	if h.gpkgStore == nil {
 		respondJSON(w, http.StatusOK, []string{})
 		return
 	}
-	respondJSON(w, http.StatusOK, h.geoStore.GetScenarios())
+	respondJSON(w, http.StatusOK, h.gpkgStore.GetScenarios())
 }
 
 // handleListColumns returns available attribute columns
 func (h *Handler) handleListColumns(w http.ResponseWriter, r *http.Request) {
-	// Prefer gpkgStore as it's now the primary source
 	if h.gpkgStore != nil {
 		respondJSON(w, http.StatusOK, h.gpkgStore.GetColumns())
-		return
-	}
-	// Fallback to geoStore for backward compatibility
-	if h.geoStore != nil {
-		respondJSON(w, http.StatusOK, h.geoStore.GetColumns())
 		return
 	}
 	respondJSON(w, http.StatusOK, []string{})
@@ -158,16 +149,16 @@ func (h *Handler) handleListColumns(w http.ResponseWriter, r *http.Request) {
 
 // handleScenarioData returns data for a scenario and attribute
 func (h *Handler) handleScenarioData(w http.ResponseWriter, r *http.Request) {
-	if h.geoStore == nil {
+	if h.gpkgStore == nil {
 		respondError(w, http.StatusNotFound, "no geo data loaded")
 		return
 	}
 
 	vars := mux.Vars(r)
-	scenario := geodata.Scenario(vars["scenario"])
+	scenario := vars["scenario"]
 	attribute := vars["attribute"]
 
-	data, err := h.geoStore.GetScenarioData(scenario, attribute)
+	data, err := h.gpkgStore.GetScenarioData(scenario, attribute)
 	if err != nil {
 		respondError(w, http.StatusNotFound, err.Error())
 		return
@@ -178,13 +169,13 @@ func (h *Handler) handleScenarioData(w http.ResponseWriter, r *http.Request) {
 
 // handleComparisonData returns comparison data for two scenarios
 func (h *Handler) handleComparisonData(w http.ResponseWriter, r *http.Request) {
-	if h.geoStore == nil {
+	if h.gpkgStore == nil {
 		respondError(w, http.StatusNotFound, "no geo data loaded")
 		return
 	}
 
-	left := geodata.Scenario(r.URL.Query().Get("left"))
-	right := geodata.Scenario(r.URL.Query().Get("right"))
+	left := r.URL.Query().Get("left")
+	right := r.URL.Query().Get("right")
 	attribute := r.URL.Query().Get("attribute")
 
 	if left == "" || right == "" || attribute == "" {
@@ -192,7 +183,7 @@ func (h *Handler) handleComparisonData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data, err := h.geoStore.GetComparisonData(left, right, attribute)
+	data, err := h.gpkgStore.GetComparisonData(left, right, attribute)
 	if err != nil {
 		respondError(w, http.StatusNotFound, err.Error())
 		return
@@ -204,18 +195,13 @@ func (h *Handler) handleComparisonData(w http.ResponseWriter, r *http.Request) {
 // handleCatchmentIdentify returns all attributes for a catchment across scenarios
 func (h *Handler) handleCatchmentIdentify(w http.ResponseWriter, r *http.Request) {
 	catchmentID := mux.Vars(r)["id"]
-	var data map[string]map[string]float64
 
-	// Try gpkgStore first (GeoPackage), then fall back to geoStore (Parquet)
-	if h.gpkgStore != nil {
-		data = h.gpkgStore.GetCatchmentAttributes(catchmentID)
+	if h.gpkgStore == nil {
+		respondError(w, http.StatusNotFound, "no geo data loaded")
+		return
 	}
 
-	// Fallback to geoStore if gpkgStore returned nothing
-	if len(data) == 0 && h.geoStore != nil {
-		data = h.geoStore.GetCatchmentAttributes(catchmentID)
-	}
-
+	data := h.gpkgStore.GetCatchmentAttributes(catchmentID)
 	if len(data) == 0 {
 		respondError(w, http.StatusNotFound, "catchment not found")
 		return

@@ -8,7 +8,7 @@ Landscape Decision Theatre is a cross-platform desktop application for exploring
 
 - **Project-based workflow** -- create, save, and organize multiple analysis projects with custom thumbnails and descriptions
 - **Side-by-side scenario comparison** -- compare catchment attributes across reference, current, and future scenarios using a map swipe interface
-- **Offline-first** -- all data is served locally from MBTiles and GeoParquet files; no internet connection required
+- **Offline-first** -- all data is served locally from MBTiles and GeoPackage files; no internet connection required
 - **Beautiful landing experience** -- welcoming landing page with easy access to projects and about information
 - **Cross-platform** -- runs on Linux, macOS, and Windows as a single binary with an embedded WebView window
 - **Beautiful cartography** -- vector tiles rendered with MapLibre GL JS, styled with a custom MapBox-compatible style

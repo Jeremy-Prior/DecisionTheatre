@@ -21,7 +21,7 @@ var version = "dev"
 func main() {
 	// Parse command-line flags
 	port := flag.Int("port", 8080, "HTTP server port")
-	dataDir := flag.String("data-dir", "", "Directory containing data files (mbtiles, geoparquet)")
+	dataDir := flag.String("data-dir", "", "Directory containing data files (mbtiles, geopackage)")
 	resourcesDir := flag.String("resources-dir", "", "Directory containing resource files (mbtiles, styles)")
 	headless := flag.Bool("headless", false, "Run in headless mode (no GUI window)")
 	showVersion := flag.Bool("version", false, "Show version and exit")

@@ -21,9 +21,8 @@
           pymdown-extensions
         ]);
 
-        # Python environment for data tooling (CSV -> Parquet conversion)
+        # Python environment for data tooling (GeoPackage creation)
         dataToolsEnv = pkgs.python3.withPackages (ps: with ps; [
-          pyarrow
           pandas
           geopandas
           shapely
@@ -102,9 +101,7 @@
                 (type == "regular" && pkgs.lib.hasSuffix ".gguf" baseName) ||
                 (type == "regular" && pkgs.lib.hasSuffix ".gob" baseName) ||
                 (type == "regular" && pkgs.lib.hasSuffix ".mbtiles" baseName) ||
-                (type == "regular" && pkgs.lib.hasSuffix ".parquet" baseName) ||
-                (type == "regular" && pkgs.lib.hasSuffix ".geoparquet" baseName) ||
-                (type == "regular" && pkgs.lib.hasSuffix ".arrow" baseName)
+                (type == "regular" && pkgs.lib.hasSuffix ".gpkg" baseName)
               );
           };
 
@@ -271,7 +268,7 @@
             # Documentation
             mkdocsEnv
 
-            # Data tooling (CSV -> Parquet)
+            # Data tooling (GeoPackage creation)
             dataToolsEnv
 
             # Nix tooling
@@ -306,6 +303,18 @@
             export PATH="$GOPATH/bin:$PATH"
 
             export CGO_ENABLED=1
+
+            # webview_go hardcodes webkit2gtk-4.0 but nixpkgs ships 4.1
+            # Create compat pkg-config and library symlink
+            COMPAT_DIR="$PWD/.webkit-compat"
+            mkdir -p "$COMPAT_DIR/pkgconfig" "$COMPAT_DIR/lib"
+            sed 's/webkit2gtk-4.1/webkit2gtk-4.0/g; s/Name: webkit2gtk-4.1/Name: webkit2gtk-4.0/' \
+              ${pkgs.webkitgtk_4_1.dev}/lib/pkgconfig/webkit2gtk-4.1.pc \
+              > "$COMPAT_DIR/pkgconfig/webkit2gtk-4.0.pc"
+            sed -i "s|-lwebkit2gtk-4.1|-lwebkit2gtk-4.0|g" "$COMPAT_DIR/pkgconfig/webkit2gtk-4.0.pc"
+            ln -sf ${pkgs.webkitgtk_4_1}/lib/libwebkit2gtk-4.1.so "$COMPAT_DIR/lib/libwebkit2gtk-4.0.so"
+            export PKG_CONFIG_PATH="$COMPAT_DIR/pkgconfig:$PKG_CONFIG_PATH"
+            export CGO_LDFLAGS="-L$COMPAT_DIR/lib $CGO_LDFLAGS"
 
             alias ll='eza -la'
             alias la='eza -a'
@@ -343,8 +352,8 @@
             echo "  make docs-serve       - Serve requirements docs"
             echo ""
             echo "Data & packaging:"
-            echo "  make csv2parquet      - Convert CSV data files to Parquet"
-            echo "  make datapack         - Build data pack zip (parquet + mbtiles)"
+            echo "  make geopackage       - Build datapack.gpkg from CSVs"
+            echo "  make datapack         - Build data pack zip (geopackage + mbtiles)"
             echo "  make list-datapack    - List contents of last built data pack"
             echo "  make packages         - Build release packages (all platforms)"
             echo "  make packages-linux   - Linux .tar.gz, .deb, .rpm"

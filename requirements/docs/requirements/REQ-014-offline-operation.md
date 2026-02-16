@@ -23,12 +23,12 @@ Single Binary (all assets from nix store at build time):
 │  ┌──────────────────────────────┐  │
 │  │ Go Server + API             │  │
 │  │ MBTiles Reader              │  │
-│  │ GeoParquet Reader           │  │
+│  │ GeoPackage Reader           │  │
 │  │ llama.cpp (CGO)             │  │
 │  │ Gorgonia (Neural Network)   │  │
 │  └──────────────────────────────┘  │
 └────────────────────────────────────┘
-     + data/ directory (MBTiles, Parquet)
+     + data/ directory (MBTiles, GeoPackage)
 ```
 
 ## Implementation Details
@@ -37,13 +37,13 @@ Single Binary (all assets from nix store at build time):
 - **Frontend**: `buildNpmPackage` fetches npm deps into the nix store with a pinned `npmDepsHash`; Vite bundles everything into static JS/CSS files; no CDN links, no external fonts, no runtime network requests
 - **Go embed**: `//go:embed static/*` bakes the Vite output into the Go binary; the embedded HTTP server serves it at `/`
 - **Vector tiles**: Served from local MBTiles (SQLite) files at `/tiles/{name}/{z}/{x}/{y}.pbf`
-- **Attribute data**: Loaded from local GeoParquet files into memory at startup
+- **Attribute data**: Queried from local GeoPackage file via SQLite
 - **LLM inference**: llama.cpp linked via CGO; GGUF model loaded from disk
 - **Neural network**: Gorgonia runs entirely in-process, no external calls
 - **No telemetry, no analytics, no external requests of any kind**
 - The only runtime input is the `data/` directory containing:
     - `.mbtiles` files for map tiles
-    - `.parquet` / `.geoparquet` files for catchment attributes
+    - `datapack.gpkg` GeoPackage for catchment attributes
     - (Optional) `.gguf` model file for LLM
 
 ### Key Files

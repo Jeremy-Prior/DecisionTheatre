@@ -50,7 +50,8 @@
       "Bash(git push:*)",
       "Bash(/home/timlinux/dev/go/DecisionTheatre/PROMPT.log)",
       "WebFetch(domain:github.com)",
-      "Bash(go build:*)"
+      "Bash(go build:*)",
+      "Bash(timeout 5 nix run:*)"
     ],
     "deny": [],
     "ask": []

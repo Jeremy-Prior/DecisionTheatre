@@ -20,7 +20,7 @@ The application bundles a Go HTTP server with an embedded React frontend. On sta
 
 1. Opens a native desktop window (WebView) displaying the landing page
 2. Loads vector map tiles from an MBTiles file (African countries, rivers, lakes, ecoregions, catchment boundaries, populated places)
-3. Loads scenario data from GeoParquet files (reference, current, future catchment attributes)
+3. Loads scenario data from GeoPackage (reference, current catchment attributes)
 4. Provides project management for organizing multiple analyses
 5. All processing happens locally -- no data leaves the user's machine
 
@@ -31,6 +31,6 @@ The application bundles a Go HTTP server with an embedded React frontend. On sta
 | Backend | Go 1.24, Gorilla Mux, go-sqlite3 |
 | Frontend | React 18, TypeScript, Chakra UI, Framer Motion, MapLibre GL JS |
 | Map Data | MBTiles (vector), MapBox GL Style JSON |
-| Scenario Data | GeoParquet |
+| Scenario Data | GeoPackage |
 | Desktop Window | webview_go (WebKit2GTK on Linux, WebView2 on Windows, WKWebView on macOS) |
 | Build System | Nix flakes, GitHub Actions |

@@ -116,7 +116,7 @@ The control panel slides in from the right when a pane is focused. The map area 
 |-----------|-------------|
 | **Left Scenario selector** | Dropdown to choose Reference, Current, or Future for the left map side |
 | **Right Scenario selector** | Dropdown to choose the scenario for the right map side |
-| **Attribute selector** | Dropdown listing all available catchment attributes from the loaded GeoParquet data |
+| **Attribute selector** | Dropdown listing all available catchment attributes from the loaded GeoPackage data |
 | **Color scale legend** | Visual representation of the data range for the selected attribute |
 
 ### Documentation Panel

@@ -5,7 +5,7 @@ This tutorial demonstrates how to compare catchment attributes across past, pres
 ## Prerequisites
 
 - Decision Theatre running with map tiles loaded
-- At least two GeoParquet scenario files in the `data/` directory (e.g., `past.geoparquet` and `present.geoparquet`)
+- A GeoPackage datapack file (`datapack.gpkg`) in the `data/` directory with `scenario_current` and `scenario_reference` tables
 
 ## Steps
 
